@@ -46,7 +46,7 @@ search
 ? {
 title:{
 contains:search,
-mode:"insensitive",
+mode:"insensitive" as const,
 },
 }
 : {},
