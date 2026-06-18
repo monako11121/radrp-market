@@ -1,8 +1,9 @@
 import "./globals.css";
 import type { Metadata } from "next";
 
-import Header from "@/components/layout/Header";
-import Footer from "@/components/layout/Footer";
+import Header     from "@/components/layout/Header";
+import Footer     from "@/components/layout/Footer";
+import BetaBanner from "@/components/layout/BetaBanner";
 
 import Provider
 from "@/components/providers/SessionProvider";
@@ -39,6 +40,7 @@ return(
 
 <Provider>
 
+<BetaBanner/>
 <Header/>
 
 {children}
