@@ -178,32 +178,49 @@ if(product.sellerId !== user.id){
 return { error: "Нет доступа к этому товару" };
 }
 
-const activeDeal =
-await prisma.deal.findFirst({
+// Сначала проверяем активные сделки — понятное сообщение пользователю
+const activeDeal = await prisma.deal.findFirst({
 where:{
 productId,
-status:{
-in:["WAITING","IN_PROGRESS"],
+status:{ in:["WAITING","IN_PROGRESS","DISPUTE"] },
 },
-},
+select:{ id:true },
 });
 
 if(activeDeal){
 return {
 error:
-"Нельзя удалить товар с активной сделкой. " +
+"Нельзя удалить товар: по нему есть активная сделка. " +
 "Дождитесь завершения или откройте спор.",
 };
 }
 
-await prisma.product.delete({
-where:{
-id:productId,
-},
+// Deal.productId — обязательный FK (не nullable).
+// Если есть любые завершённые сделки — Product удалить нельзя без потери истории.
+const anyDeal = await prisma.deal.findFirst({
+where:{ productId },
+select:{ id:true },
 });
+
+if(anyDeal){
+return {
+error:
+"Нельзя удалить товар: по нему есть история сделок. " +
+"Обратитесь в поддержку для архивирования.",
+};
+}
+
+// Нет сделок — безопасно удаляем зависимые записи, затем Product.
+// Favorite.productId — обязательный FK, удаляем вручную.
+// TransactionHistory.productId — nullable FK, Prisma обнулит автоматически.
+await prisma.$transaction([
+prisma.favorite.deleteMany({ where:{ productId } }),
+prisma.product.delete({ where:{ id:productId } }),
+]);
 
 revalidatePath("/profile");
 revalidatePath("/catalog");
+revalidatePath("/");
 
 return null;
 
