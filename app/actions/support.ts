@@ -42,8 +42,7 @@ export async function createTicket(
   });
 
   // Уведомляем всех администраторов
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
-  const admins = await prisma.user.findMany({ where: { email: { in: adminEmails } } });
+  const admins = await prisma.user.findMany({ where: { role: { in: ["ADMIN", "OWNER"] } } });
   await Promise.all(admins.map(a =>
     createNotification({
       userId:  a.id,
@@ -72,7 +71,7 @@ export async function sendTicketMessage(
   const ticket = await prisma.supportTicket.findUnique({ where: { id: ticketId } });
   if (!ticket) return { error: "Обращение не найдено" };
 
-  const canAccess = ticket.userId === user.id || isAdmin(user.email);
+  const canAccess = ticket.userId === user.id || isAdmin(user.role);
   if (!canAccess) return { error: "Нет доступа" };
 
   if (ticket.status === "CLOSED") return { error: "Обращение закрыто" };
@@ -93,8 +92,7 @@ export async function sendTicketMessage(
     }).catch(()=>{});
   } else {
     // Пишет владелец — уведомляем администраторов
-    const adminEmails = (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
-    const admins = await prisma.user.findMany({ where: { email: { in: adminEmails } } });
+    const admins = await prisma.user.findMany({ where: { role: { in: ["ADMIN", "OWNER"] } } });
     await Promise.all(admins.map(a =>
       createNotification({
         userId:  a.id,
@@ -118,7 +116,7 @@ export async function updateTicketStatus(
   formData: FormData,
 ): Promise<TicketActionState> {
   const user     = await getUser();
-  if (!isAdmin(user.email)) return { error: "Нет доступа" };
+  if (!isAdmin(user.role)) return { error: "Нет доступа" };
 
   const ticketId = formData.get("ticketId") as string;
   const status   = formData.get("status")   as string;

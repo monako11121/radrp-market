@@ -143,7 +143,7 @@ wordBreak:"break-word",
 
 </h1>
 
-{isAdmin(user.email) && (
+{user.role !== "USER" && (
 <div
 style={{
 display:"inline-flex",
@@ -151,15 +151,15 @@ alignItems:"center",
 gap:6,
 padding:"4px 14px",
 borderRadius:20,
-background:"rgba(239,68,68,.12)",
-border:"1px solid rgba(239,68,68,.3)",
-color:"#ef4444",
+background: user.role === "OWNER" ? "rgba(168,85,247,.12)" : "rgba(239,68,68,.12)",
+border: user.role === "OWNER" ? "1px solid rgba(168,85,247,.3)" : "1px solid rgba(239,68,68,.3)",
+color: user.role === "OWNER" ? "#a855f7" : "#ef4444",
 fontWeight:700,
 fontSize:13,
 marginBottom:14,
 }}
 >
-⚙ Администратор
+{user.role === "OWNER" ? "👑 Владелец" : "⚙ Администратор"}
 </div>
 )}
 

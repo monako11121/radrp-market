@@ -48,7 +48,7 @@ await getServerSession(authOptions);
 
 if(
 !session?.user?.email ||
-!isAdmin(session.user.email)
+!isAdmin(session.user.role)
 ){
 redirect("/");
 }

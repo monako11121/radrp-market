@@ -8,7 +8,7 @@ import WithdrawalsClient    from "./WithdrawalsClient";
 export default async function AdminWithdrawalsPage() {
 
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email || !isAdmin(session.user.email)) redirect("/");
+  if (!session?.user?.email || !isAdmin(session.user.role)) redirect("/");
 
   const select = {
     id:         true,

@@ -28,14 +28,14 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
       user:     { select: { username: true } },
       messages: {
         orderBy: { createdAt: "asc" },
-        include: { user: { select: { id: true, username: true, email: true } } },
+        include: { user: { select: { id: true, username: true, email: true, role: true } } },
       },
     },
   });
 
   if (!ticket) notFound();
 
-  const canAccess = ticket.userId === user.id || isAdmin(user.email);
+  const canAccess = ticket.userId === user.id || isAdmin(user.role);
   if (!canAccess) redirect("/support");
 
   const st = STATUS_LABEL[ticket.status] ?? STATUS_LABEL.OPEN;
@@ -58,7 +58,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
           <h1 style={{ fontSize: 22, fontWeight: 800, marginBottom: 6 }}>{ticket.subject}</h1>
           <div style={{ fontSize: 13, color: "#7e8796" }}>
             Открыт {new Date(ticket.createdAt).toLocaleDateString("ru-RU", { day: "numeric", month: "long", year: "numeric" })}
-            {isAdmin(user.email) && ` · ${ticket.user.username}`}
+            {isAdmin(user.role) && ` · ${ticket.user.username}`}
           </div>
         </div>
         <span style={{
@@ -74,14 +74,14 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
         ticketId={ticket.id}
         ticketStatus={ticket.status}
         currentUserId={user.id}
-        isCurrentUserAdmin={isAdmin(user.email)}
+        isCurrentUserAdmin={isAdmin(user.role)}
         messages={ticket.messages.map(m => ({
           id:        m.id,
           message:   m.message,
           createdAt: m.createdAt.toISOString(),
           userId:    m.userId,
           username:  m.user.username,
-          isAdmin:   isAdmin(m.user.email ?? ""),
+          isAdmin:   isAdmin(m.user.role),
         }))}
       />
 

@@ -788,7 +788,7 @@ const isParticipant =
 dealCheck.buyerId === user.id ||
 dealCheck.sellerId === user.id;
 
-if(!isParticipant && !isAdmin(user.email)){
+if(!isParticipant && !isAdmin(user.role)){
 return;
 }
 
@@ -799,7 +799,7 @@ return;
 }
 
 // Принять сделку (IN_PROGRESS) может только продавец
-if(status === "IN_PROGRESS" && dealCheck.sellerId !== user.id && !isAdmin(user.email)){
+if(status === "IN_PROGRESS" && dealCheck.sellerId !== user.id && !isAdmin(user.role)){
 return;
 }
 

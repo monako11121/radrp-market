@@ -144,7 +144,7 @@ export async function requestWithdrawal(
 
 async function requireAdmin() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email || !isAdmin(session.user.email)) redirect("/");
+  if (!session?.user?.email || !isAdmin(session.user.role)) redirect("/");
 }
 
 // Подтвердить пополнение вручную (администратор)

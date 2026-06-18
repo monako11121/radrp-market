@@ -7,11 +7,12 @@ import { usePathname } from "next/navigation";
 import { formatMoney } from "@/lib/formatMoney";
 
 const ADMIN_MENU = [
-  { label: "Споры",       href: "/admin/disputes",   active: true  },
-  { label: "Тикеты",      href: "/admin/tickets",    active: true  },
-  { label: "Выводы",      href: "/admin/withdrawals",active: true  },
-  { label: "Пополнения",  href: "/admin/deposits",   active: true  },
-  { label: "Статистика",  href: "/admin/stats",      active: false },
+  { label: "Споры",         href: "/admin/disputes",   active: true,  ownerOnly: false },
+  { label: "Тикеты",        href: "/admin/tickets",    active: true,  ownerOnly: false },
+  { label: "Выводы",        href: "/admin/withdrawals",active: true,  ownerOnly: false },
+  { label: "Пополнения",    href: "/admin/deposits",   active: true,  ownerOnly: false },
+  { label: "Пользователи",  href: "/admin/users",      active: true,  ownerOnly: true  },
+  { label: "Статистика",    href: "/admin/stats",      active: false, ownerOnly: false },
 ];
 
 export default function Header(){
@@ -23,6 +24,7 @@ const [adminOpen, setAdminOpen] = useState(false);
 const [balance,     setBalance]     = useState<number | null>(null);
 const [frozen,      setFrozen]      = useState<number>(0);
 const [isAdmin,     setIsAdmin]     = useState(false);
+const [isOwner,     setIsOwner]     = useState(false);
 const [unreadCount, setUnreadCount] = useState(0);
 
 const adminRef = useRef<HTMLDivElement>(null);
@@ -34,6 +36,7 @@ if(!session?.user?.email){
 setBalance(null);
 setFrozen(0);
 setIsAdmin(false);
+setIsOwner(false);
 setUnreadCount(0);
 return;
 }
@@ -45,6 +48,7 @@ if(typeof data.availableBalance === "number") setBalance(data.availableBalance);
 else if(typeof data.balance === "number")     setBalance(data.balance);
 if(typeof data.frozenBalance === "number")    setFrozen(data.frozenBalance);
 if(typeof data.isAdmin === "boolean")         setIsAdmin(data.isAdmin);
+if(typeof data.isOwner === "boolean")         setIsOwner(data.isOwner);
 if(typeof data.unreadCount === "number")      setUnreadCount(data.unreadCount);
 })
 .catch(()=>{});
@@ -158,7 +162,7 @@ boxShadow:"0 16px 48px rgba(0,0,0,.6)",
 zIndex:200,
 }}
 >
-{ADMIN_MENU.map((item)=>(
+{ADMIN_MENU.filter(item => !item.ownerOnly || isOwner).map((item)=>(
 <div key={item.href}>
 {item.active ? (
 <Link
@@ -383,7 +387,7 @@ padding:"4px 0 0",
 АДМИН-ПАНЕЛЬ
 </div>
 
-{ADMIN_MENU.map((item)=>
+{ADMIN_MENU.filter(item => !item.ownerOnly || isOwner).map((item)=>
 item.active ? (
 <Link key={item.href} href={item.href} onClick={()=>setMenuOpen(false)}>
 <div className="navButton" style={{ color:"#ef4444" }}>

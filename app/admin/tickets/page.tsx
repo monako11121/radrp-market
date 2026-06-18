@@ -19,7 +19,7 @@ export default async function AdminTicketsPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email || !isAdmin(session.user.email)) redirect("/");
+  if (!session?.user?.email || !isAdmin(session.user.role)) redirect("/");
 
   const { status } = await searchParams;
 

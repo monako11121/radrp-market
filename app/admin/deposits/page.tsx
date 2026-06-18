@@ -14,7 +14,7 @@ export default async function AdminDepositsPage({
   searchParams: Promise<{ status?: string }>;
 }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email || !isAdmin(session.user.email)) redirect("/");
+  if (!session?.user?.email || !isAdmin(session.user.role)) redirect("/");
 
   const params = await searchParams;
   const statusFilter = params.status || "PENDING";

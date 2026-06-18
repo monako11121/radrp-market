@@ -17,7 +17,7 @@ const STATUS_LABEL: Record<string, { label: string; color: string }> = {
 export default async function AdminTicketPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const session = await getServerSession(authOptions);
-  if (!session?.user?.email || !isAdmin(session.user.email)) redirect("/");
+  if (!session?.user?.email || !isAdmin(session.user.role)) redirect("/");
 
   const user = await prisma.user.findUnique({ where: { email: session.user.email } });
   if (!user) redirect("/");
@@ -28,7 +28,7 @@ export default async function AdminTicketPage({ params }: { params: Promise<{ id
       user:     { select: { username: true, email: true, createdAt: true } },
       messages: {
         orderBy: { createdAt: "asc" },
-        include: { user: { select: { id: true, username: true, email: true } } },
+        include: { user: { select: { id: true, username: true, email: true, role: true } } },
       },
     },
   });
@@ -85,7 +85,7 @@ export default async function AdminTicketPage({ params }: { params: Promise<{ id
           createdAt: m.createdAt.toISOString(),
           userId:    m.userId,
           username:  m.user.username,
-          isAdmin:   isAdmin(m.user.email ?? ""),
+          isAdmin:   isAdmin(m.user.role),
         }))}
       />
 
