@@ -150,6 +150,13 @@ grid-template-columns:1fr !important;
 
 }
 
+.dealsList{
+
+max-height:260px;
+overflow-y:auto;
+
+}
+
 }
 
 @media(max-width:1000px){
@@ -183,6 +190,42 @@ grid-template-columns:1fr !important;
 }
 
 .productSidebar{
+
+position:static !important;
+
+}
+
+.sellerLayout{
+
+grid-template-columns:1fr !important;
+
+}
+
+.ticketAdminLayout{
+
+grid-template-columns:1fr !important;
+
+}
+
+.sellerSidebar{
+
+position:static !important;
+
+}
+
+.reviewLayout{
+
+grid-template-columns:1fr !important;
+
+}
+
+.faqLayout{
+
+grid-template-columns:1fr !important;
+
+}
+
+.faqNav{
 
 position:static !important;
 

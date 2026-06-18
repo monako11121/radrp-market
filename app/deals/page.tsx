@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatMoney } from "@/lib/formatMoney";
 
 import Link from "next/link";
 
@@ -13,27 +14,39 @@ import { redirect }
 from "next/navigation";
 
 import {
-updateDealStatus,
-} from "@/app/actions/deals";
-
-import {
 sendMessage,
 } from "@/app/actions/messages";
 
 import SendMessageForm
 from "@/components/deals/SendMessageForm";
 
+import DealActions
+from "@/components/deals/DealActions";
+
+import ReviewForm
+from "@/components/deals/ReviewForm";
+
 import {
 categoryIcons,
 } from "@/lib/categoryIcons";
 
+const STATUS_LABELS: Record<string,string> = {
+WAITING: "Ожидание",
+IN_PROGRESS: "В работе",
+DONE: "Завершено",
+DISPUTE: "Спор открыт",
+};
+
 export default async function DealsPage({
 searchParams,
 }:{
-searchParams:{
+searchParams:Promise<{
 id?:string;
-};
+}>;
 }){
+
+const { id: dealIdParam } =
+await searchParams;
 
 const session =
 await getServerSession(authOptions);
@@ -95,6 +108,8 @@ createdAt:"asc",
 },
 },
 
+review:true,
+
 },
 
 orderBy:{
@@ -107,7 +122,7 @@ const activeDeal =
 
 deals.find(
 (deal)=>
-deal.id === searchParams.id
+deal.id === dealIdParam
 )
 
 ||
@@ -198,6 +213,7 @@ marginBottom:30,
 ) : (
 
 <div
+className="dealsLayout"
 style={{
 display:"grid",
 gridTemplateColumns:"380px 1fr",
@@ -207,7 +223,7 @@ alignItems:"start",
 >
 
 <div
-className="card"
+className="card dealsList"
 style={{
 padding:18,
 display:"flex",
@@ -339,7 +355,7 @@ whiteSpace:"nowrap",
 }}
 >
 
-{deal.status}
+{STATUS_LABELS[deal.status] ?? deal.status}
 
 </div>
 
@@ -364,7 +380,7 @@ color:"#7e8796",
 }}
 >
 
-${deal.product.price}
+{formatMoney(deal.product.price)}
 
 </div>
 
@@ -438,7 +454,7 @@ color:"#7e8796",
 
 <span>
 
-${activeDeal.product.price}
+{formatMoney(activeDeal.product.price)}
 
 </span>
 
@@ -469,7 +485,7 @@ fontWeight:700,
 }}
 >
 
-{activeDeal.status}
+{STATUS_LABELS[activeDeal.status] ?? activeDeal.status}
 
 </div>
 
@@ -485,95 +501,79 @@ minHeight:520,
 }}
 >
 
+<DealActions
+dealId={activeDeal.id}
+status={activeDeal.status}
+isBuyer={activeDeal.buyerId === user.id}
+isFrozen={activeDeal.isFrozen}
+/>
+
+{activeDeal.status === "DONE" &&
+activeDeal.buyerId === user.id &&
+!activeDeal.review && (
+
+<ReviewForm dealId={activeDeal.id} />
+
+)}
+
+{activeDeal.status === "DONE" &&
+activeDeal.review && (
+
+<div
+style={{
+padding:"16px 18px",
+borderRadius:14,
+background:"rgba(255,255,255,.03)",
+border:"1px solid #1d2734",
+}}
+>
+
+<div
+style={{
+fontSize:13,
+color:"#7e8796",
+marginBottom:8,
+}}
+>
+Ваш отзыв
+</div>
+
 <div
 style={{
 display:"flex",
-gap:14,
-marginBottom:20,
+alignItems:"center",
+gap:8,
+marginBottom: activeDeal.review.comment ? 8 : 0,
 }}
 >
 
-<form
-action={async()=>{
-
-"use server";
-
-await updateDealStatus(
-activeDeal.id,
-"IN_PROGRESS"
-);
-
-}}
->
-
-<button
-className="darkButton"
-type="submit"
->
-
-Принять
-
-</button>
-
-</form>
-
-<form
-action={async()=>{
-
-"use server";
-
-await updateDealStatus(
-activeDeal.id,
-"DONE"
-);
-
-}}
->
-
-<button
-className="orangeButton"
-type="submit"
->
-
-Завершить
-
-</button>
-
-</form>
-
-<form
-action={async()=>{
-
-"use server";
-
-await updateDealStatus(
-activeDeal.id,
-"DISPUTE"
-);
-
-}}
->
-
-<button
-type="submit"
+{[1,2,3,4,5].map((s)=>(
+<span
+key={s}
 style={{
-height:52,
-padding:"0 22px",
-borderRadius:16,
-border:"1px solid rgba(239,68,68,.25)",
-background:"rgba(239,68,68,.12)",
-color:"#ef4444",
-fontWeight:700,
+fontSize:18,
+color:s <= activeDeal.review!.rating ? "#ff9a00" : "#2d3748",
 }}
 >
+★
+</span>
+))}
 
-Спор
-
-</button>
-
-</form>
+<span style={{ fontSize:14, color:"#7e8796" }}>
+{activeDeal.review.rating}/5
+</span>
 
 </div>
+
+{activeDeal.review.comment && (
+<div style={{ fontSize:14, color:"#c0c8d4" }}>
+{activeDeal.review.comment}
+</div>
+)}
+
+</div>
+
+)}
 
 {activeDeal.messages.length === 0 ? (
 

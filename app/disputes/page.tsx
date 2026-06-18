@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatMoney } from "@/lib/formatMoney";
 
 import {
 getServerSession,
@@ -11,12 +12,9 @@ import { redirect }
 from "next/navigation";
 
 import {
-updateDealStatus,
-} from "@/app/actions/deals";
-
-import {
 categoryIcons,
 } from "@/lib/categoryIcons";
+
 
 export default async function DisputesPage(){
 
@@ -24,9 +22,16 @@ const session =
 await getServerSession(authOptions);
 
 if(!session?.user?.email){
-
 redirect("/auth");
+}
 
+const user =
+await prisma.user.findUnique({
+where:{ email:session.user.email },
+});
+
+if(!user){
+redirect("/auth");
 }
 
 const disputes =
@@ -34,6 +39,10 @@ await prisma.deal.findMany({
 
 where:{
 status:"DISPUTE",
+OR:[
+{ buyerId: user.id },
+{ sellerId: user.id },
+],
 },
 
 include:{
@@ -137,7 +146,11 @@ gap:22,
 }}
 >
 
-{disputes.map((deal)=>(
+{disputes.map((deal)=>{
+
+const isBuyer = deal.buyerId === user.id;
+
+return(
 
 <div
 key={deal.id}
@@ -222,7 +235,7 @@ color:"#7e8796",
 </div>
 
 <div>
-Цена: ${deal.product.price}
+Цена: {formatMoney(deal.product.price)}
 </div>
 
 </div>
@@ -236,57 +249,41 @@ color:"#7e8796",
 <div
 style={{
 display:"flex",
-gap:14,
+flexDirection:"column",
+alignItems:"flex-end",
+gap:10,
 }}
 >
 
-<form
-action={async()=>{
+<div
+style={{
+padding:"6px 14px",
+borderRadius:999,
+background:"rgba(239,68,68,.15)",
+color:"#ef4444",
+fontWeight:700,
+fontSize:12,
+}}
+>
+Спор открыт
+</div>
 
-"use server";
-
-await updateDealStatus(
-deal.id,
-"DONE"
-);
-
+<div
+style={{
+padding:"6px 14px",
+borderRadius:999,
+background: isBuyer
+? "rgba(255,153,0,.12)"
+: "rgba(34,197,94,.10)",
+color: isBuyer ? "#ff9a00" : "#22c55e",
+fontWeight:600,
+fontSize:12,
 }}
 >
 
-<button
-className="orangeButton"
-type="submit"
->
+{isBuyer ? "Вы покупатель" : "Вы продавец"}
 
-Решить спор
-
-</button>
-
-</form>
-
-<form
-action={async()=>{
-
-"use server";
-
-await updateDealStatus(
-deal.id,
-"IN_PROGRESS"
-);
-
-}}
->
-
-<button
-className="darkButton"
-type="submit"
->
-
-Вернуть сделку
-
-</button>
-
-</form>
+</div>
 
 </div>
 
@@ -298,6 +295,7 @@ padding:22,
 borderRadius:22,
 background:"rgba(239,68,68,.08)",
 border:"1px solid rgba(239,68,68,.18)",
+marginBottom:22,
 }}
 >
 
@@ -329,9 +327,25 @@ lineHeight:1.8,
 
 </div>
 
+<div
+style={{
+padding:"14px 18px",
+borderRadius:14,
+background:"rgba(255,154,0,.06)",
+border:"1px solid rgba(255,154,0,.15)",
+color:"#ffb340",
+fontSize:14,
+lineHeight:1.6,
+}}
+>
+⏳ Спор передан администратору. Решение будет принято в течение 1–3 рабочих дней. Вы получите уведомление о результате.
 </div>
 
-))}
+</div>
+
+);
+
+})}
 
 </div>
 

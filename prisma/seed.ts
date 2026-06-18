@@ -12,7 +12,7 @@ username:"Vadym",
 email:"vadym@gmail.com",
 password:"123456",
 
-balance:12450,
+availableBalance:12450,
 
 },
 

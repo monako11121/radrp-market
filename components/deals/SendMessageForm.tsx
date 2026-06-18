@@ -6,6 +6,7 @@ useRouter,
 
 import {
 useRef,
+useState,
 useTransition,
 } from "react";
 
@@ -18,7 +19,7 @@ dealId:string;
 sendMessage:(
 dealId:string,
 text:string,
-)=>Promise<void>;
+)=>Promise<{ error: string } | undefined>;
 }){
 
 const router =
@@ -29,6 +30,9 @@ useRef<HTMLFormElement>(null);
 
 const [isPending,startTransition] =
 useTransition();
+
+const [msgError, setMsgError] =
+useState<string | null>(null);
 
 return(
 
@@ -41,10 +45,14 @@ String(formData.get("text"));
 
 startTransition(async()=>{
 
-await sendMessage(
-dealId,
-text
-);
+setMsgError(null);
+
+const result = await sendMessage(dealId, text);
+
+if(result?.error){
+setMsgError(result.error);
+return;
+}
 
 formRef.current?.reset();
 
@@ -54,12 +62,31 @@ router.refresh();
 
 }}
 style={{
+position:"relative",
 padding:24,
 borderTop:"1px solid rgba(255,255,255,.06)",
 display:"flex",
 gap:16,
 }}
 >
+
+{msgError && (
+<div style={{
+position:"absolute",
+bottom:"100%",
+left:24,
+right:24,
+marginBottom:8,
+padding:"10px 16px",
+borderRadius:12,
+background:"rgba(239,68,68,.12)",
+border:"1px solid rgba(239,68,68,.22)",
+color:"#ef4444",
+fontSize:13,
+}}>
+{msgError}
+</div>
+)}
 
 <input
 name="text"

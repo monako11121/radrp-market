@@ -1,34 +1,64 @@
 import Link from "next/link";
+import { prisma } from "@/lib/prisma";
 
-export default function HomePage() {
-
-const categories = [
-
+const CATEGORIES = [
 {
-title:"Вирты",
-count:"12 456 товаров",
-icon:"💰",
+title: "Вирты",
+icon: "💰",
+slug: "Вирты",
 },
-
 {
-title:"Имущество",
-count:"8 234 товара",
-icon:"🏠",
+title: "Имущество",
+icon: "🏠",
+slug: "Имущество",
 },
-
 {
-title:"Транспорт",
-count:"9 876 товаров",
-icon:"🚘",
+title: "Транспорт",
+icon: "🚘",
+slug: "Транспорт",
 },
-
 {
-title:"Аксессуары",
-count:"1 234 товара",
-icon:"🎒",
+title: "Аксессуары",
+icon: "🎒",
+slug: "Аксессуары",
 },
+] as const;
 
-];
+function formatCount(n: number): string {
+if(n === 0) return "0 товаров";
+const mod10 = n % 10;
+const mod100 = n % 100;
+if(mod10 === 1 && mod100 !== 11) return `${n} товар`;
+if(mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20)) return `${n} товара`;
+return `${n} товаров`;
+}
+
+export default async function HomePage(){
+
+const [
+virtyCnt,
+propertyCnt,
+transportCnt,
+accessoriesCnt,
+totalCnt,
+userCnt,
+doneCnt,
+] = await Promise.all([
+prisma.product.count({ where:{ category:"Вирты" } }),
+prisma.product.count({ where:{ category:"Имущество" } }),
+prisma.product.count({ where:{ category:"Транспорт" } }),
+prisma.product.count({ where:{ category:"Аксессуары" } }),
+prisma.product.count(),
+prisma.user.count(),
+prisma.deal.count({ where:{ status:"DONE" } }),
+]);
+
+const counts: Record<string, number> = {
+"Вирты":       virtyCnt,
+"Имущество":   propertyCnt,
+"Транспорт":   transportCnt,
+"Аксессуары":  accessoriesCnt,
+};
 
 return(
 
@@ -75,7 +105,7 @@ width:"fit-content",
 }}
 >
 
-● Безопасные сделки между игроками
+● Маркетплейс для игроков Radmir RP
 
 </div>
 
@@ -158,81 +188,30 @@ marginTop:56,
 >
 
 <div>
-
-<div
-style={{
-fontSize:34,
-fontWeight:800,
-}}
->
-
-12K+
-
+<div style={{ fontSize:34, fontWeight:800 }}>
+{totalCnt}
 </div>
-
-<div
-style={{
-marginTop:6,
-color:"#7e8796",
-}}
->
-
-Объявлений
-
+<div style={{ marginTop:6, color:"#7e8796" }}>
+{formatCount(totalCnt)}
 </div>
-
 </div>
 
 <div>
-
-<div
-style={{
-fontSize:34,
-fontWeight:800,
-}}
->
-
-4.9★
-
+<div style={{ fontSize:34, fontWeight:800 }}>
+{userCnt}
 </div>
-
-<div
-style={{
-marginTop:6,
-color:"#7e8796",
-}}
->
-
-Рейтинг сервиса
-
+<div style={{ marginTop:6, color:"#7e8796" }}>
+{userCnt === 1 ? "Пользователь" : userCnt >= 2 && userCnt <= 4 ? "Пользователя" : "Пользователей"}
 </div>
-
 </div>
 
 <div>
-
-<div
-style={{
-fontSize:34,
-fontWeight:800,
-}}
->
-
-24/7
-
+<div style={{ fontSize:34, fontWeight:800 }}>
+{doneCnt}
 </div>
-
-<div
-style={{
-marginTop:6,
-color:"#7e8796",
-}}
->
-
-Поддержка
-
+<div style={{ marginTop:6, color:"#7e8796" }}>
+{doneCnt === 1 ? "Сделка" : doneCnt >= 2 && doneCnt <= 4 ? "Сделки" : "Сделок"} завершено
 </div>
-
 </div>
 
 </div>
@@ -313,8 +292,8 @@ maxWidth:340,
 }}
 >
 
-Лучшие предложения
-для игроков проекта
+Предложения игроков
+Radmir RP
 
 </h2>
 
@@ -336,7 +315,7 @@ marginBottom:8,
 }}
 >
 
-Онлайн продавцов
+Завершённых сделок
 
 </div>
 
@@ -347,7 +326,7 @@ fontWeight:800,
 }}
 >
 
-1 284
+{doneCnt}
 
 </div>
 
@@ -366,10 +345,18 @@ zIndex:2,
 }}
 >
 
-{categories.map((category)=>(
+{CATEGORIES.map((cat)=>(
+
+<Link
+key={cat.slug}
+href={`/catalog?category=${encodeURIComponent(cat.slug)}`}
+style={{
+textDecoration:"none",
+display:"block",
+}}
+>
 
 <div
-key={category.title}
 className="card"
 style={{
 padding:28,
@@ -378,6 +365,8 @@ background:"rgba(255,255,255,.03)",
 display:"flex",
 flexDirection:"column",
 justifyContent:"space-between",
+cursor:"pointer",
+transition:"border-color .18s, background .18s",
 }}
 >
 
@@ -387,7 +376,7 @@ fontSize:42,
 }}
 >
 
-{category.icon}
+{cat.icon}
 
 </div>
 
@@ -401,7 +390,7 @@ marginBottom:10,
 }}
 >
 
-{category.title}
+{cat.title}
 
 </h3>
 
@@ -413,7 +402,7 @@ lineHeight:1.7,
 }}
 >
 
-{category.count}
+{formatCount(counts[cat.slug])}
 
 </p>
 
@@ -434,6 +423,8 @@ fontWeight:600,
 </div>
 
 </div>
+
+</Link>
 
 ))}
 
@@ -502,8 +493,8 @@ lineHeight:1.8,
 }}
 >
 
-Все сделки проходят через систему
-защиты покупателей и продавцов.
+Сделки со встроенным арбитражем —
+при конфликте открывай спор.
 
 </p>
 
@@ -553,8 +544,8 @@ lineHeight:1.8,
 }}
 >
 
-Покупка и продажа происходят
-быстро и без лишних действий.
+Три шага: создать сделку,
+принять и завершить.
 
 </p>
 
@@ -593,7 +584,7 @@ marginBottom:12,
 }}
 >
 
-Поддержка 24/7
+Система споров
 
 </h3>
 
@@ -604,8 +595,8 @@ lineHeight:1.8,
 }}
 >
 
-Помощь при проблемах,
-спорах и вопросах пользователей.
+Открой спор — администратор
+рассмотрит ситуацию и примет решение.
 
 </p>
 

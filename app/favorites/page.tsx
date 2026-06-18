@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { formatMoney } from "@/lib/formatMoney";
 
 import {
 getServerSession,
@@ -295,7 +296,7 @@ color:"#ff9a00",
 }}
 >
 
-${favorite.product.pricePerKK}
+{formatMoney(favorite.product.pricePerKK!)}/кк
 
 </span>
 
@@ -315,7 +316,7 @@ marginBottom:18,
 }}
 >
 
-${favorite.product.price}
+{formatMoney(favorite.product.price)}
 
 </div>
 

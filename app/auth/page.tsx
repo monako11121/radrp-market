@@ -1,33 +1,110 @@
 "use client";
 
-import { registerUser } from "../actions/auth";
-import { signIn } from "next-auth/react";
-import { useState } from "react";
+import { registerUser }
+from "../actions/auth";
 
-export default function AuthPage(){
+import { signIn }
+from "next-auth/react";
+
+import {
+useState,
+useActionState,
+useEffect,
+Suspense,
+} from "react";
+
+import { useSearchParams } from "next/navigation";
+
+const inputStyle = {
+width:"100%",
+height:58,
+background:"#0d1219",
+border:"1px solid #1d2734",
+borderRadius:16,
+padding:"0 18px",
+color:"white",
+outline:"none",
+fontSize:15,
+} as const;
+
+const labelStyle = {
+marginBottom:10,
+fontSize:14,
+color:"#7e8796",
+} as const;
+
+function AuthPageInner(){
+
+const searchParams = useSearchParams();
+const registered   = searchParams.get("registered") === "1";
 
 const [isLogin,setIsLogin] =
 useState(true);
 
-async function handleLogin(
-formData:FormData
-){
+// При редиректе после регистрации переключаемся на форму входа
+useEffect(()=>{
+if(registered) setIsLogin(true);
+},[registered]);
 
-const email =
-formData.get("email") as string;
+// --- Регистрация ---
+const [registerState,registerAction,isPending] =
+useActionState(registerUser, null);
 
-const password =
-formData.get("password") as string;
+// --- Вход ---
+const [loginEmail,setLoginEmail] =
+useState("");
 
+const [loginPassword,setLoginPassword] =
+useState("");
+
+const [loginError,setLoginError] =
+useState<string | null>(null);
+
+const [loginPending,setLoginPending] =
+useState(false);
+
+async function handleLogin(){
+
+if(!loginEmail || !loginPassword) return;
+
+setLoginError(null);
+setLoginPending(true);
+
+try{
+
+const result =
 await signIn("credentials",{
-
-email,
-password,
-
-callbackUrl:"/",
-
+email: loginEmail,
+password: loginPassword,
+redirect: false,
 });
 
+if(result?.error){
+setLoginError("Неверный email или пароль");
+}else{
+window.location.href = "/";
+}
+
+}catch{
+
+setLoginError("Ошибка входа. Попробуйте ещё раз.");
+
+}finally{
+
+setLoginPending(false);
+
+}
+
+}
+
+function switchToRegister(){
+setIsLogin(false);
+setLoginError(null);
+}
+
+function switchToLogin(){
+setIsLogin(true);
+setLoginError(null);
 }
 
 return(
@@ -66,9 +143,7 @@ marginBottom:18,
 }}
 >
 
-{isLogin
-? "Вход в аккаунт"
-: "Создание аккаунта"}
+{isLogin ? "Вход в аккаунт" : "Создание аккаунта"}
 
 </h1>
 
@@ -87,12 +162,27 @@ lineHeight:1.7,
 
 </div>
 
-<form
-action={
-isLogin
-? handleLogin
-: registerUser
-}
+{registered && (
+<div
+style={{
+padding:"14px 18px",
+borderRadius:14,
+background:"rgba(34,197,94,.12)",
+border:"1px solid rgba(34,197,94,.25)",
+color:"#22c55e",
+fontSize:15,
+marginBottom:24,
+textAlign:"center",
+}}
+>
+✅ Аккаунт создан — теперь войдите
+</div>
+)}
+
+{isLogin ? (
+
+// ---- ФОРМА ВХОДА — без <form>, контролируемые инпуты ----
+<div
 style={{
 display:"flex",
 flexDirection:"column",
@@ -100,146 +190,162 @@ gap:20,
 }}
 >
 
-{!isLogin && (
-
 <div>
-
-<div
-style={{
-marginBottom:10,
-fontSize:14,
-color:"#7e8796",
-}}
->
-
-Username
-
-</div>
-
+<div style={labelStyle}>Email</div>
 <input
-name="username"
-placeholder="Vadym"
-required
-style={{
-width:"100%",
-height:58,
-background:"#0d1219",
-border:"1px solid #1d2734",
-borderRadius:16,
-padding:"0 18px",
-color:"white",
-outline:"none",
-fontSize:15,
-}}
-/>
-
-</div>
-
-)}
-
-<div>
-
-<div
-style={{
-marginBottom:10,
-fontSize:14,
-color:"#7e8796",
-}}
->
-
-Email
-
-</div>
-
-<input
-name="email"
 type="email"
 placeholder="example@gmail.com"
-required
-style={{
-width:"100%",
-height:58,
-background:"#0d1219",
-border:"1px solid #1d2734",
-borderRadius:16,
-padding:"0 18px",
-color:"white",
-outline:"none",
-fontSize:15,
-}}
+value={loginEmail}
+onChange={(e)=>setLoginEmail(e.target.value)}
+onKeyDown={(e)=>{ if(e.key==="Enter") handleLogin(); }}
+style={inputStyle}
 />
-
 </div>
 
 <div>
-
-<div
-style={{
-marginBottom:10,
-fontSize:14,
-color:"#7e8796",
-}}
->
-
-Пароль
-
-</div>
-
+<div style={labelStyle}>Пароль</div>
 <input
-name="password"
 type="password"
 placeholder="Введите пароль"
-required
-style={{
-width:"100%",
-height:58,
-background:"#0d1219",
-border:"1px solid #1d2734",
-borderRadius:16,
-padding:"0 18px",
-color:"white",
-outline:"none",
-fontSize:15,
-}}
+value={loginPassword}
+onChange={(e)=>setLoginPassword(e.target.value)}
+onKeyDown={(e)=>{ if(e.key==="Enter") handleLogin(); }}
+style={inputStyle}
 />
-
 </div>
 
+{loginError && (
+<div
+style={{
+padding:"14px 18px",
+borderRadius:14,
+background:"rgba(239,68,68,.12)",
+border:"1px solid rgba(239,68,68,.22)",
+color:"#ef4444",
+fontSize:15,
+}}
+>
+{loginError}
+</div>
+)}
+
 <button
-type="submit"
+type="button"
 className="orangeButton"
+disabled={loginPending}
+onClick={handleLogin}
 style={{
 width:"100%",
 height:58,
 marginTop:8,
+opacity: loginPending ? 0.6 : 1,
 }}
 >
-
-{isLogin
-? "Войти"
-: "Создать аккаунт"}
-
+{loginPending ? "Загрузка..." : "Войти"}
 </button>
 
 <button
 type="button"
-onClick={()=>
-setIsLogin(!isLogin)
-}
+onClick={switchToRegister}
 className="darkButton"
 style={{
 width:"100%",
 height:58,
 }}
 >
+Создать аккаунт
+</button>
 
-{isLogin
-? "Создать аккаунт"
-: "Уже есть аккаунт"}
+</div>
 
+) : (
+
+// ---- ФОРМА РЕГИСТРАЦИИ — через useActionState ----
+<form
+action={registerAction}
+style={{
+display:"flex",
+flexDirection:"column",
+gap:20,
+}}
+>
+
+<div>
+<div style={labelStyle}>Username</div>
+<input
+name="username"
+placeholder="Vadym"
+required
+style={inputStyle}
+/>
+</div>
+
+<div>
+<div style={labelStyle}>Email</div>
+<input
+name="email"
+type="email"
+placeholder="example@gmail.com"
+required
+style={inputStyle}
+/>
+</div>
+
+<div>
+<div style={labelStyle}>Пароль</div>
+<input
+name="password"
+type="password"
+placeholder="Минимум 8 символов"
+required
+style={inputStyle}
+/>
+</div>
+
+{registerState?.error && (
+<div
+style={{
+padding:"14px 18px",
+borderRadius:14,
+background:"rgba(239,68,68,.12)",
+border:"1px solid rgba(239,68,68,.22)",
+color:"#ef4444",
+fontSize:15,
+}}
+>
+{registerState.error}
+</div>
+)}
+
+<button
+type="submit"
+className="orangeButton"
+disabled={isPending}
+style={{
+width:"100%",
+height:58,
+marginTop:8,
+opacity: isPending ? 0.6 : 1,
+}}
+>
+{isPending ? "Загрузка..." : "Создать аккаунт"}
+</button>
+
+<button
+type="button"
+onClick={switchToLogin}
+className="darkButton"
+style={{
+width:"100%",
+height:58,
+}}
+>
+Уже есть аккаунт
 </button>
 
 </form>
+
+)}
 
 <div
 style={{
@@ -263,4 +369,12 @@ lineHeight:1.7,
 
 );
 
+}
+
+export default function AuthPage(){
+return(
+<Suspense>
+<AuthPageInner />
+</Suspense>
+);
 }

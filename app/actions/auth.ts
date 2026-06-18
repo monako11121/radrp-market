@@ -8,49 +8,67 @@ from "@/lib/prisma";
 import { redirect }
 from "next/navigation";
 
+type RegisterState = {
+error: string;
+} | null;
+
 export async function registerUser(
-formData:FormData
-){
+_prevState: RegisterState,
+formData: FormData,
+): Promise<RegisterState>{
 
 const username =
-formData.get("username") as string;
+(formData.get("username") as string)?.trim();
 
 const email =
-formData.get("email") as string;
+(formData.get("email") as string)?.trim();
 
 const password =
 formData.get("password") as string;
 
-const existingUser =
+if(!username || !email || !password){
+return { error: "Заполните все поля" };
+}
+
+if(password.length < 8){
+return { error: "Пароль должен содержать минимум 8 символов" };
+}
+
+const existingEmail =
 await prisma.user.findUnique({
-
-where:{
-email,
-},
-
+where:{ email },
 });
 
-if(existingUser){
+if(existingEmail){
+return {
+error: "Пользователь с таким email уже зарегистрирован",
+};
+}
 
-return;
+const existingUsername =
+await prisma.user.findUnique({
+where:{ username },
+});
 
+if(existingUsername){
+return {
+error: "Это имя пользователя уже занято",
+};
 }
 
 const hashedPassword =
-await bcrypt.hash(password,10);
+await bcrypt.hash(password, 10);
 
 await prisma.user.create({
 
 data:{
-
 username,
 email,
-password:hashedPassword,
-
+password: hashedPassword,
 },
 
 });
 
-redirect("/auth");
+redirect("/auth?registered=1");
 
 }

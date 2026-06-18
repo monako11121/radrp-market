@@ -65,7 +65,6 @@ return{
 id:user.id,
 email:user.email,
 name:user.username,
-balance:user.balance,
 
 };
 
@@ -89,7 +88,6 @@ user,
 if(user){
 
 token.id = user.id;
-token.balance = user.balance;
 
 }
 
@@ -106,9 +104,6 @@ if(session.user){
 
 session.user.id =
 token.id as string;
-
-session.user.balance =
-token.balance as number;
 
 }
 

@@ -1,105 +1,258 @@
 generator client {
-provider = "prisma-client-js"
+  provider = "prisma-client-js"
 }
 
 datasource db {
-provider = "postgresql"
-url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
 }
 
 model User {
-
-id        String   @id @default(cuid())
-
-username  String   @unique
-email     String   @unique
-password  String
-
-balance   Float    @default(0)
-
-createdAt DateTime @default(now())
-
-products     Product[]
-
-buyerDeals   Deal[] @relation("BuyerDeals")
-sellerDeals  Deal[] @relation("SellerDeals")
-
-messages     Message[]
-
-favorites    Favorite[]
+  id                       String               @id @default(cuid())
+  username                 String               @unique
+  email                    String               @unique
+  password                 String
+  availableBalance         Float                @default(0)
+  frozenBalance            Float                @default(0)
+  pendingWithdrawalBalance Float                @default(0)
+  createdAt                DateTime             @default(now())
+  buyerDeals       Deal[]               @relation("BuyerDeals")
+  sellerDeals      Deal[]               @relation("SellerDeals")
+  favorites        Favorite[]
+  messages         Message[]
+  products         Product[]
+  transactions     TransactionHistory[]
+  deposits         DepositRequest[]
+  withdrawals      WithdrawalRequest[]
+  reviewsGiven     Review[]             @relation("BuyerReviews")
+  reviewsReceived  Review[]             @relation("SellerReviews")
+  notifications    Notification[]
+  tickets          SupportTicket[]
+  ticketMessages   TicketMessage[]
 }
 
 model Product {
-
-id          String   @id @default(cuid())
-
-title       String
-description String
-
-price       Float
-
-category    String
-server      Int
-
-stock       Float?
-pricePerKK  Float?
-
-createdAt   DateTime @default(now())
-
-sellerId    String
-seller      User @relation(fields:[sellerId], references:[id])
-
-deals       Deal[]
-
-favorites   Favorite[]
+  id           String               @id @default(cuid())
+  title        String
+  description  String
+  price        Float
+  category     String
+  server       Int
+  createdAt    DateTime             @default(now())
+  sellerId     String
+  pricePerKK   Float?
+  stock        Float?
+  deals        Deal[]
+  favorites    Favorite[]
+  seller       User                 @relation(fields: [sellerId], references: [id])
+  transactions TransactionHistory[]
 }
 
 model Deal {
-
-id          String   @id @default(cuid())
-
-status      String
-
-createdAt   DateTime @default(now())
-
-buyerId     String
-buyer       User @relation("BuyerDeals", fields:[buyerId], references:[id])
-
-sellerId    String
-seller      User @relation("SellerDeals", fields:[sellerId], references:[id])
-
-productId   String
-product     Product @relation(fields:[productId], references:[id])
-
-messages    Message[]
+  id           String               @id @default(cuid())
+  status       String
+  buyerId      String
+  sellerId     String
+  productId    String
+  price        Float                @default(0)
+  isFrozen     Boolean              @default(false)
+  disputedAt   DateTime?
+  createdAt    DateTime             @default(now())
+  buyer        User                 @relation("BuyerDeals", fields: [buyerId], references: [id])
+  product      Product              @relation(fields: [productId], references: [id])
+  seller       User                 @relation("SellerDeals", fields: [sellerId], references: [id])
+  messages      Message[]
+  transactions  TransactionHistory[]
+  review        Review?
+  adminDecision AdminDecision?
 }
 
 model Message {
-
-id          String   @id @default(cuid())
-
-text        String
-
-createdAt   DateTime @default(now())
-
-dealId      String
-deal        Deal @relation(fields:[dealId], references:[id])
-
-senderId    String
-sender      User @relation(fields:[senderId], references:[id])
+  id        String   @id @default(cuid())
+  text      String
+  createdAt DateTime @default(now())
+  dealId    String
+  senderId  String
+  deal      Deal     @relation(fields: [dealId], references: [id])
+  sender    User     @relation(fields: [senderId], references: [id])
 }
 
 model Favorite {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+  userId    String
+  productId String
+  product   Product  @relation(fields: [productId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 
-id          String   @id @default(cuid())
+  @@unique([userId, productId])
+}
 
-createdAt   DateTime @default(now())
+// ─── Внутренний регистр движения средств ───────────────────────────────────
+// Типы:
+//   FREEZE          — availableBalance → frozenBalance (при покупке)
+//   COMPLETE_BUYER  — frozenBalance списан при завершении сделки
+//   COMPLETE_SELLER — начислено продавцу после вычета комиссии
+//   COMMISSION      — 5% комиссия платформы (запись на продавца)
+//   UNFREEZE        — возврат из frozenBalance при споре в пользу покупателя
+//   DEPOSIT         — пополнение баланса (вручную или через провайдер)
+//   WITHDRAWAL      — вывод средств продавцом
+model TransactionHistory {
+  id                String             @id @default(cuid())
+  userId            String
+  type              String
+  amount            Float
+  description       String
+  dealId            String?
+  productId         String?
+  depositRequestId  String?
+  withdrawalRequestId String?
+  createdAt         DateTime           @default(now())
+  user              User               @relation(fields: [userId], references: [id])
+  deal              Deal?              @relation(fields: [dealId], references: [id])
+  product           Product?           @relation(fields: [productId], references: [id])
+  depositRequest    DepositRequest?    @relation(fields: [depositRequestId], references: [id])
+  withdrawalRequest WithdrawalRequest? @relation(fields: [withdrawalRequestId], references: [id])
+}
 
-userId      String
-user        User @relation(fields:[userId], references:[id])
+// ─── Заявки на пополнение баланса ──────────────────────────────────────────
+// Статусы: PENDING → COMPLETED | FAILED | CANCELLED
+//
+// provider:          "manual" | "yookassa" | "tinkoff" | "stripe" | "cryptomus"
+// method:            "card" | "sbp" | "crypto" | "manual"
+// providerPaymentId: ID платежа на стороне провайдера (из webhook/redirect)
+// metadata:          сырой JSON от провайдера для аудита (webhook body, redirect params)
+// feeAmount:         комиссия провайдера (для учёта)
+// netAmount:         amount - feeAmount (фактически зачисляется пользователю)
+model DepositRequest {
+  id                String               @id @default(cuid())
+  userId            String
+  amount            Float                // сумма к зачислению (без комиссии провайдера)
+  feeAmount         Float                @default(0) // комиссия провайдера
+  netAmount         Float                // amount - feeAmount
+  status            String               @default("PENDING")
+  provider          String               @default("manual")
+  providerPaymentId String?
+  method            String               @default("manual")
+  redirectUrl       String?              // URL для редиректа на оплату
+  webhookSecret     String?              // для верификации webhook (хранить зашифрованным)
+  failReason        String?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  completedAt       DateTime?
+  user              User                 @relation(fields: [userId], references: [id])
+  transactions      TransactionHistory[]
 
-productId   String
-product     Product @relation(fields:[productId], references:[id])
+  @@index([userId])
+  @@index([status])
+  @@index([providerPaymentId])
+}
 
-@@unique([userId, productId])
+// ─── Заявки на вывод средств ───────────────────────────────────────────────
+// Статусы: PENDING → COMPLETED | FAILED | CANCELLED
+//
+// provider:          "manual" | "yookassa" | "tinkoff_payout" | "stripe_payout"
+// method:            "card" | "sbp" | "crypto"
+// requisites:        зашифрованный номер карты / телефон для СБП (никогда plain-text)
+// feeAmount:         комиссия платформы за вывод
+// netAmount:         amount - feeAmount (сумма, которую получает пользователь)
+// providerPaymentId: ID выплаты на стороне провайдера
+model WithdrawalRequest {
+  id                String               @id @default(cuid())
+  userId            String
+  amount            Float                // запрошенная сумма вывода
+  feeAmount         Float                @default(0) // комиссия платформы за вывод
+  netAmount         Float                // amount - feeAmount
+  status            String               @default("PENDING")
+  provider          String               @default("manual")
+  providerPaymentId String?
+  method            String               @default("card")
+  requisites        String?              // зашифрованные реквизиты
+  failReason        String?
+  metadata          Json?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  completedAt       DateTime?
+  user              User                 @relation(fields: [userId], references: [id])
+  transactions      TransactionHistory[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+// ─── Журнал решений администратора по спорам ───────────────────────────────
+// decision: "BUYER" — возврат покупателю; "SELLER" — передать продавцу
+model AdminDecision {
+  id         String   @id @default(cuid())
+  dealId     String   @unique
+  adminEmail String
+  decision   String   // "BUYER" | "SELLER"
+  amount     Float    @default(0)
+  note       String?
+  createdAt  DateTime @default(now())
+  deal       Deal     @relation(fields: [dealId], references: [id])
+}
+
+// ─── Отзывы покупателей о продавцах ────────────────────────────────────────
+// Один отзыв на одну сделку (dealId уникален).
+// rating: 1–5; comment: необязателен.
+model Review {
+  id        String   @id @default(cuid())
+  rating    Int      // 1–5
+  comment   String?
+  createdAt DateTime @default(now())
+  dealId    String   @unique
+  buyerId   String
+  sellerId  String
+  deal      Deal     @relation(fields: [dealId], references: [id])
+  buyer     User     @relation("BuyerReviews", fields: [buyerId], references: [id])
+  seller    User     @relation("SellerReviews", fields: [sellerId], references: [id])
+
+  @@index([sellerId])
+}
+
+// ─── Тикеты поддержки ──────────────────────────────────────────────────────
+// status: OPEN → IN_PROGRESS → CLOSED
+model SupportTicket {
+  id        String          @id @default(cuid())
+  userId    String
+  subject   String
+  status    String          @default("OPEN")
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  user      User            @relation(fields: [userId], references: [id])
+  messages  TicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+model TicketMessage {
+  id        String        @id @default(cuid())
+  ticketId  String
+  userId    String
+  message   String
+  createdAt DateTime      @default(now())
+  ticket    SupportTicket @relation(fields: [ticketId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
+
+  @@index([ticketId])
+}
+
+// ─── Уведомления пользователей ─────────────────────────────────────────────
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  type      String
+  title     String
+  message   String
+  href      String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@index([userId, read])
+  @@index([userId, createdAt])
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { formatMoney } from "@/lib/formatMoney";
 
 import { prisma } from "@/lib/prisma";
 
@@ -142,8 +143,8 @@ lineHeight:1.7,
 }}
 >
 
-Товары теперь загружаются
-из настоящей базы данных.
+Игровая валюта, транспорт, имущество и аксессуары
+для серверов Radmir RP.
 
 </p>
 
@@ -511,7 +512,7 @@ color:"#ff9a00",
 }}
 >
 
-${product.pricePerKK}
+{formatMoney(product.pricePerKK)}/кк
 
 </span>
 
@@ -531,7 +532,7 @@ marginBottom:18,
 }}
 >
 
-${product.price}
+{formatMoney(product.price)}
 
 </div>
 

@@ -1,9 +1,13 @@
 import { prisma } from "@/lib/prisma";
+import { formatMoney } from "@/lib/formatMoney";
 
 import Link from "next/link";
 
-import { createDeal }
+import { contactSeller }
 from "@/app/actions/deals";
+
+import BuyConfirmModal
+from "@/components/product/BuyConfirmModal";
 
 import {
 toggleFavorite,
@@ -56,6 +60,18 @@ favorites:true,
 },
 
 });
+
+const sellerReviews = product
+? await prisma.review.findMany({
+where:{ sellerId:product.sellerId },
+select:{ rating:true },
+})
+: [];
+
+const sellerAvgRating =
+sellerReviews.length > 0
+? sellerReviews.reduce((s,r)=>s+r.rating,0) / sellerReviews.length
+: null;
 
 if(!product){
 
@@ -311,7 +327,7 @@ fontSize:28,
 }}
 >
 
-${product.pricePerKK}
+{formatMoney(product.pricePerKK)}/кк
 
 </span>
 
@@ -330,7 +346,7 @@ color:"#ff9a00",
 }}
 >
 
-${product.price}
+{formatMoney(product.price)}
 
 </div>
 
@@ -454,43 +470,68 @@ gap:14,
 }}
 >
 
-<form
-action={async()=>{
+{currentUser?.id === product.sellerId ? (
 
-"use server";
-
-await createDeal(product.id);
-
-}}
+<div
 style={{
 flex:1,
+padding:"14px 22px",
+borderRadius:16,
+background:"rgba(255,255,255,.04)",
+border:"1px solid rgba(255,255,255,.08)",
+color:"#7e8796",
+fontWeight:600,
+textAlign:"center",
+}}
+>
+
+Это ваш товар
+
+</div>
+
+) : (
+
+<>
+
+<div style={{ flex:1 }}>
+<BuyConfirmModal
+productId={product.id}
+productTitle={product.title}
+productPrice={product.price}
+/>
+</div>
+
+<form
+action={async()=>{
+"use server";
+await contactSeller(product.id);
 }}
 >
 
 <button
 type="submit"
-className="orangeButton"
 style={{
-width:"100%",
-}}
->
-
-Купить
-
-</button>
-
-</form>
-
-<button
-className="darkButton"
-style={{
-flex:1,
+height:52,
+padding:"0 22px",
+borderRadius:16,
+border:"1px solid #1d2734",
+background:"#11161f",
+color:"white",
+fontWeight:700,
+cursor:"pointer",
+whiteSpace:"nowrap",
 }}
 >
 
 Написать
 
 </button>
+
+</form>
+
+</>
+
+)}
 
 </div>
 
@@ -534,18 +575,21 @@ flexShrink:0,
 
 <div>
 
-<div
+<Link
+href={`/seller/${product.seller.id}`}
 style={{
 fontSize:20,
 fontWeight:700,
 marginBottom:6,
 wordBreak:"break-word",
+color:"white",
+display:"block",
 }}
 >
 
 {product.seller.username}
 
-</div>
+</Link>
 
 <div
 style={{
@@ -557,24 +601,55 @@ color:"#7e8796",
 
 </div>
 
-</div>
+{sellerAvgRating !== null && (
 
-</div>
-
-<Link href="/profile">
-
-<button
-className="darkButton"
+<div
 style={{
-width:"100%",
+display:"flex",
+alignItems:"center",
+gap:6,
+marginTop:8,
+flexWrap:"wrap",
 }}
 >
 
-Смотреть профиль
+<span style={{ color:"#ff9a00", fontSize:15 }}>★</span>
 
-</button>
+<span style={{ fontSize:14, fontWeight:700 }}>
+{sellerAvgRating.toFixed(1)}
+</span>
 
+<Link
+href={`/seller/${product.seller.id}/reviews`}
+style={{
+fontSize:12,
+color:"#7e8796",
+textDecoration:"underline",
+textUnderlineOffset:3,
+}}
+>
+{sellerReviews.length}{" "}
+{sellerReviews.length === 1
+? "отзыв"
+: sellerReviews.length >= 2 && sellerReviews.length <= 4
+? "отзыва"
+: "отзывов"}
 </Link>
+
+</div>
+
+)}
+
+{sellerAvgRating === null && (
+<div style={{ marginTop:8, fontSize:12, color:"#4a5568" }}>
+Нет отзывов
+</div>
+)}
+
+</div>
+
+</div>
+
 
 </div>
 

@@ -1,4 +1,6 @@
 import { prisma } from "@/lib/prisma";
+import { formatMoney } from "@/lib/formatMoney";
+import { isAdmin } from "@/lib/admin";
 
 import { getServerSession }
 from "next-auth";
@@ -11,9 +13,8 @@ import Link from "next/link";
 import { redirect }
 from "next/navigation";
 
-import {
-deleteProduct,
-} from "@/app/actions/products";
+import DeleteProductButton
+from "@/components/profile/DeleteProductButton";
 
 import {
 categoryIcons,
@@ -48,6 +49,22 @@ if(!user){
 redirect("/auth");
 
 }
+
+const [reviews, doneDealsCnt] = await Promise.all([
+prisma.review.findMany({
+where:{ sellerId:user.id },
+orderBy:{ createdAt:"desc" },
+include:{ buyer:{ select:{ username:true } } },
+}),
+prisma.deal.count({
+where:{ sellerId:user.id, status:"DONE" },
+}),
+]);
+
+const avgRating =
+reviews.length > 0
+? reviews.reduce((sum, r) => sum + r.rating, 0) / reviews.length
+: null;
 
 return(
 
@@ -120,6 +137,26 @@ wordBreak:"break-word",
 
 </h1>
 
+{isAdmin(user.email) && (
+<div
+style={{
+display:"inline-flex",
+alignItems:"center",
+gap:6,
+padding:"4px 14px",
+borderRadius:20,
+background:"rgba(239,68,68,.12)",
+border:"1px solid rgba(239,68,68,.3)",
+color:"#ef4444",
+fontWeight:700,
+fontSize:13,
+marginBottom:14,
+}}
+>
+⚙ Администратор
+</div>
+)}
+
 <p
 style={{
 color:"#7e8796",
@@ -135,6 +172,64 @@ marginBottom:30,
 года
 
 </p>
+
+{/* Статистика продавца */}
+<div
+style={{
+display:"grid",
+gridTemplateColumns:"1fr 1fr 1fr",
+gap:12,
+width:"100%",
+marginBottom:20,
+}}
+>
+
+<div
+className="card"
+style={{
+padding:"14px 12px",
+textAlign:"center",
+}}
+>
+<div style={{ fontSize:22, fontWeight:800, color:"#ff9a00" }}>
+{avgRating !== null ? avgRating.toFixed(1) : "—"}
+</div>
+<div style={{ fontSize:12, color:"#7e8796", marginTop:4 }}>
+Рейтинг
+</div>
+</div>
+
+<div
+className="card"
+style={{
+padding:"14px 12px",
+textAlign:"center",
+}}
+>
+<div style={{ fontSize:22, fontWeight:800 }}>
+{reviews.length}
+</div>
+<div style={{ fontSize:12, color:"#7e8796", marginTop:4 }}>
+Отзывов
+</div>
+</div>
+
+<div
+className="card"
+style={{
+padding:"14px 12px",
+textAlign:"center",
+}}
+>
+<div style={{ fontSize:22, fontWeight:800 }}>
+{doneDealsCnt}
+</div>
+<div style={{ fontSize:12, color:"#7e8796", marginTop:4 }}>
+Сделок
+</div>
+</div>
+
+</div>
 
 <div
 className="card"
@@ -164,7 +259,7 @@ fontWeight:900,
 }}
 >
 
-${user.balance}
+{formatMoney(user.availableBalance)}
 
 </div>
 
@@ -186,6 +281,27 @@ marginBottom:14,
 >
 
 Добавить товар
+
+</button>
+
+</Link>
+
+<Link
+href="/withdraw"
+style={{
+width:"100%",
+}}
+>
+
+<button
+className="darkButton"
+style={{
+width:"100%",
+marginBottom:14,
+}}
+>
+
+Вывести средства
 
 </button>
 
@@ -279,7 +395,7 @@ marginBottom:12,
 }}
 >
 
-Баланс
+Доступный баланс
 
 </div>
 
@@ -290,9 +406,33 @@ fontWeight:900,
 }}
 >
 
-${user.balance}
+{formatMoney(user.availableBalance)}
 
 </div>
+
+{user.frozenBalance > 0 && (
+<div
+style={{
+marginTop:10,
+fontSize:14,
+color:"#ffb340",
+}}
+>
+🔒 Заморожено в сделке: {formatMoney(user.frozenBalance)}
+</div>
+)}
+
+{user.pendingWithdrawalBalance > 0 && (
+<div
+style={{
+marginTop:8,
+fontSize:14,
+color:"#a78bfa",
+}}
+>
+⏳ На выводе: {formatMoney(user.pendingWithdrawalBalance)}
+</div>
+)}
 
 </div>
 
@@ -509,7 +649,7 @@ color:"#ff9a00",
 }}
 >
 
-${product.price}
+{formatMoney(product.price)}
 
 </div>
 
@@ -547,40 +687,7 @@ height:46,
 
 </Link>
 
-<form
-action={async()=>{
-
-"use server";
-
-await deleteProduct(
-product.id
-);
-
-}}
-style={{
-flex:1,
-}}
->
-
-<button
-type="submit"
-style={{
-width:"100%",
-height:46,
-borderRadius:14,
-border:"1px solid rgba(239,68,68,.22)",
-background:"rgba(239,68,68,.12)",
-color:"#ef4444",
-fontWeight:700,
-cursor:"pointer",
-}}
->
-
-Удалить
-
-</button>
-
-</form>
+<DeleteProductButton productId={product.id} />
 
 </div>
 
@@ -597,6 +704,117 @@ cursor:"pointer",
 </div>
 
 </div>
+
+{/* Секция отзывов о продавце */}
+{reviews.length > 0 && (
+
+<div
+style={{
+marginTop:40,
+}}
+>
+
+<div style={{ display:"flex", alignItems:"center", justifyContent:"space-between", gap:16, marginBottom:20, flexWrap:"wrap" }}>
+
+<h2
+style={{
+fontSize:28,
+fontWeight:800,
+margin:0,
+}}
+>
+
+Отзывы покупателей
+
+</h2>
+
+<Link
+href={`/seller/${user.id}/reviews`}
+style={{
+fontSize:14,
+color:"#ff9a00",
+textDecoration:"none",
+fontWeight:600,
+}}
+>
+Все отзывы →
+</Link>
+
+</div>
+
+<div
+style={{
+display:"grid",
+gridTemplateColumns:"repeat(auto-fill,minmax(320px,1fr))",
+gap:16,
+}}
+>
+
+{reviews.map((review)=>(
+
+<div
+key={review.id}
+className="card"
+style={{
+padding:20,
+}}
+>
+
+<div
+style={{
+display:"flex",
+alignItems:"center",
+justifyContent:"space-between",
+marginBottom:10,
+}}
+>
+
+<div style={{ display:"flex", gap:3 }}>
+{[1,2,3,4,5].map((s)=>(
+<span
+key={s}
+style={{
+fontSize:16,
+color:s <= review.rating ? "#ff9a00" : "#2d3748",
+}}
+>
+★
+</span>
+))}
+</div>
+
+<span style={{ fontSize:12, color:"#7e8796" }}>
+{new Date(review.createdAt).toLocaleDateString()}
+</span>
+
+</div>
+
+{review.comment && (
+<p
+style={{
+fontSize:14,
+color:"#c0c8d4",
+lineHeight:1.7,
+marginBottom:10,
+}}
+>
+{review.comment}
+</p>
+)}
+
+<div style={{ fontSize:12, color:"#7e8796" }}>
+{review.buyer.username}
+</div>
+
+</div>
+
+))}
+
+</div>
+
+</div>
+
+)}
 
 </main>
 
