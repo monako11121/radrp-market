@@ -114,7 +114,9 @@ return { error: "Укажите цену за 1кк (должна быть > 0)"
 }
 }
 
-const effectivePrice = isVirty ? (pricePerKK ?? 0) : price;
+const effectivePrice = isVirty
+? Math.round((stock ?? 0) * (pricePerKK ?? 0) * 100) / 100
+: price;
 
 const validationError =
 validateProduct(title,description,effectivePrice,category,server);
