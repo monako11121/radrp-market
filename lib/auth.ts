@@ -38,6 +38,13 @@ export const authOptions: AuthOptions = {
       if (user) {
         token.id   = user.id;
         token.role = user.role;
+      } else if (token.id) {
+        // Refresh role from DB on every token use so changes take effect immediately
+        const fresh = await prisma.user.findUnique({
+          where:  { id: token.id as string },
+          select: { role: true },
+        });
+        if (fresh) token.role = fresh.role;
       }
       return token;
     },
