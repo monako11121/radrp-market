@@ -3,8 +3,9 @@ import { authOptions } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import type { Metadata } from "next";
-import SettingsForm from "./SettingsForm";
-import Link from "next/link";
+import SettingsForm  from "./SettingsForm";
+import PasswordForm  from "./PasswordForm";
+import Link          from "next/link";
 
 export const metadata: Metadata = { title: "Настройки профиля" };
 
@@ -47,6 +48,10 @@ export default async function SettingsPage() {
       </div>
 
       <SettingsForm username={user.username} email={user.email} />
+
+      <div style={{ marginTop: 28 }}>
+        <PasswordForm />
+      </div>
     </main>
   );
 }

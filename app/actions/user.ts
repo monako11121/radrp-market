@@ -16,6 +16,8 @@ from "next/navigation";
 import { revalidatePath }
 from "next/cache";
 
+import bcrypt from "bcryptjs";
+
 export type SettingsState = {
 error?: string;
 success?: string;
@@ -79,5 +81,41 @@ revalidatePath("/profile");
 revalidatePath("/profile/settings");
 
 return { success: "Username успешно обновлён" };
+
+}
+
+export async function changePassword(
+_prevState: SettingsState,
+formData: FormData,
+): Promise<SettingsState>{
+
+const session = await getServerSession(authOptions);
+if(!session?.user?.email) redirect("/auth");
+
+const user = await prisma.user.findUnique({ where:{ email:session.user.email } });
+if(!user) redirect("/auth");
+
+const current     = (formData.get("currentPassword") as string ?? "").trim();
+const next        = (formData.get("newPassword")      as string ?? "").trim();
+const confirm     = (formData.get("confirmPassword")  as string ?? "").trim();
+
+if(!current || !next || !confirm)
+  return { error: "Заполните все поля" };
+
+if(next.length < 8)
+  return { error: "Новый пароль должен содержать минимум 8 символов" };
+
+if(next !== confirm)
+  return { error: "Пароли не совпадают" };
+
+const valid = await bcrypt.compare(current, user.password);
+if(!valid)
+  return { error: "Текущий пароль неверен" };
+
+const hash = await bcrypt.hash(next, 12);
+await prisma.user.update({ where:{ id:user.id }, data:{ password:hash } });
+
+revalidatePath("/profile/settings");
+return { success: "Пароль успешно изменён" };
 
 }
