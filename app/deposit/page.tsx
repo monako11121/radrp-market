@@ -34,8 +34,6 @@ export default function DepositPage() {
       .finally(() => setLoadingBalance(false));
   }, [status, state]);
 
-  const walletAddress = process.env.NEXT_PUBLIC_USDT_TRC20_ADDRESS ?? "";
-
   if (status === "loading" || status === "unauthenticated") {
     return (
       <main className="container" style={{ paddingTop: 80, textAlign: "center", color: "#7e8796" }}>
@@ -46,6 +44,7 @@ export default function DepositPage() {
 
   // После создания заявки — показываем инструкцию
   if (state?.depositId) {
+    const walletAddress = state.walletAddress ?? "";
     return (
       <main className="container" style={{ paddingTop: 60, paddingBottom: 100, maxWidth: 620 }}>
 

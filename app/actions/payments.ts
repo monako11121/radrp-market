@@ -281,6 +281,7 @@ export type CryptoDepositState = {
   error?: string;
   depositId?: string;
   amount?: number;
+  walletAddress?: string;
 } | null;
 
 // Создать заявку на крипто-пополнение — баланс НЕ трогаем
@@ -317,7 +318,8 @@ export async function requestCryptoDeposit(
     },
   });
 
-  return { depositId: deposit.id, amount: amountRaw };
+  const walletAddress = process.env.CRYPTO_USDT_TRC20_ADDRESS ?? "";
+  return { depositId: deposit.id, amount: amountRaw, walletAddress };
 }
 
 // Подтвердить крипто-пополнение (администратор) — зачислить баланс
