@@ -293,6 +293,27 @@ marginBottom:14,
 </Link>
 
 <Link
+href="/deposit"
+style={{
+width:"100%",
+}}
+>
+
+<button
+className="orangeButton"
+style={{
+width:"100%",
+marginBottom:14,
+}}
+>
+
+Пополнить
+
+</button>
+
+</Link>
+
+<Link
 href="/withdraw"
 style={{
 width:"100%",

@@ -7,10 +7,11 @@ import { usePathname } from "next/navigation";
 import { formatMoney } from "@/lib/formatMoney";
 
 const ADMIN_MENU = [
-  { label: "Споры",      href: "/admin/disputes",   active: true  },
-  { label: "Тикеты",     href: "/admin/tickets",    active: true  },
-  { label: "Выводы",     href: "/admin/withdrawals",active: true  },
-  { label: "Статистика", href: "/admin/stats",      active: false },
+  { label: "Споры",       href: "/admin/disputes",   active: true  },
+  { label: "Тикеты",      href: "/admin/tickets",    active: true  },
+  { label: "Выводы",      href: "/admin/withdrawals",active: true  },
+  { label: "Пополнения",  href: "/admin/deposits",   active: true  },
+  { label: "Статистика",  href: "/admin/stats",      active: false },
 ];
 
 export default function Header(){
@@ -239,6 +240,10 @@ minWidth:90,
 </div>
 )}
 </div>
+
+<Link href="/deposit">
+<button className="darkButton" style={{ height:48 }}>Пополнить</button>
+</Link>
 
 <Link href="/sell">
 <button className="orangeButton" style={{ height:48 }}>Продать</button>

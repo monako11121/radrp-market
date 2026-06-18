@@ -137,6 +137,8 @@ model DepositRequest {
   redirectUrl       String?              // URL для редиректа на оплату
   webhookSecret     String?              // для верификации webhook (хранить зашифрованным)
   failReason        String?
+  txHash            String?              // хэш крипто-транзакции (для crypto_manual)
+  adminNote         String?              // комментарий администратора
   metadata          Json?
   createdAt         DateTime             @default(now())
   updatedAt         DateTime             @updatedAt

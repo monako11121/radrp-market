@@ -274,3 +274,141 @@ export async function adminFailWithdrawal(
     return { error: "Ошибка при отклонении вывода" };
   }
 }
+
+// ─── Крипто-пополнение (USDT TRC20, ручное подтверждение) ────────────────────
+
+export type CryptoDepositState = {
+  error?: string;
+  depositId?: string;
+  amount?: number;
+} | null;
+
+// Создать заявку на крипто-пополнение — баланс НЕ трогаем
+export async function requestCryptoDeposit(
+  _prev: CryptoDepositState,
+  formData: FormData,
+): Promise<CryptoDepositState> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) redirect("/auth");
+
+  const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+  if (!user) redirect("/auth");
+
+  const amountRaw = parseFloat(formData.get("amount") as string);
+  if (isNaN(amountRaw) || amountRaw <= 0) {
+    return { error: "Введите корректную сумму" };
+  }
+  if (amountRaw < 1) {
+    return { error: "Минимальная сумма пополнения: $1" };
+  }
+  if (amountRaw > 100000) {
+    return { error: "Максимальная сумма за один перевод: $100 000" };
+  }
+
+  const deposit = await prisma.depositRequest.create({
+    data: {
+      userId:    user.id,
+      amount:    amountRaw,
+      feeAmount: 0,
+      netAmount: amountRaw,
+      status:    "PENDING",
+      provider:  "crypto_manual",
+      method:    "usdt_trc20",
+    },
+  });
+
+  return { depositId: deposit.id, amount: amountRaw };
+}
+
+// Подтвердить крипто-пополнение (администратор) — зачислить баланс
+export async function adminApproveCryptoDeposit(
+  _prev: PaymentActionState,
+  formData: FormData,
+): Promise<PaymentActionState> {
+  await requireAdmin();
+
+  const depositId = formData.get("depositId") as string;
+  const txHash    = (formData.get("txHash") as string)?.trim() || null;
+  const adminNote = (formData.get("adminNote") as string)?.trim() || null;
+
+  const deposit = await prisma.depositRequest.findUnique({ where: { id: depositId } });
+  if (!deposit) return { error: "Заявка не найдена" };
+  if (deposit.status !== "PENDING") return { error: "Заявка уже обработана" };
+
+  try {
+    await prisma.$transaction(async (tx) => {
+      await tx.depositRequest.update({
+        where: { id: depositId },
+        data: {
+          status:      "APPROVED",
+          completedAt: new Date(),
+          txHash:      txHash  ?? undefined,
+          adminNote:   adminNote ?? undefined,
+        },
+      });
+
+      await tx.user.update({
+        where: { id: deposit.userId },
+        data:  { availableBalance: { increment: deposit.netAmount } },
+      });
+
+      await tx.transactionHistory.create({
+        data: {
+          userId:           deposit.userId,
+          type:             "DEPOSIT",
+          amount:           deposit.netAmount,
+          description:      `Пополнение USDT TRC20 — подтверждено администратором`,
+          depositRequestId: deposit.id,
+        },
+      });
+    }, { isolationLevel: "Serializable", timeout: 5000 });
+
+    await createNotification({
+      userId:  deposit.userId,
+      type:    "WITHDRAWAL_APPROVED",
+      title:   "Пополнение подтверждено",
+      message: `$${deposit.netAmount} зачислены на ваш баланс`,
+      href:    "/transactions",
+    }).catch(() => {});
+
+    revalidatePath("/admin/deposits");
+    revalidatePath("/transactions");
+    revalidatePath("/profile");
+
+    return { success: `Пополнение $${deposit.netAmount} подтверждено и зачислено` };
+  } catch {
+    return { error: "Ошибка при подтверждении. Попробуйте ещё раз." };
+  }
+}
+
+// Отклонить крипто-пополнение (администратор) — баланс не трогаем
+export async function adminRejectCryptoDeposit(
+  _prev: PaymentActionState,
+  formData: FormData,
+): Promise<PaymentActionState> {
+  await requireAdmin();
+
+  const depositId = formData.get("depositId") as string;
+  const adminNote = (formData.get("adminNote") as string)?.trim() || "Отклонено администратором";
+
+  const deposit = await prisma.depositRequest.findUnique({ where: { id: depositId } });
+  if (!deposit) return { error: "Заявка не найдена" };
+  if (deposit.status !== "PENDING") return { error: "Заявка уже обработана" };
+
+  await prisma.depositRequest.update({
+    where: { id: depositId },
+    data:  { status: "REJECTED", adminNote, updatedAt: new Date() },
+  });
+
+  await createNotification({
+    userId:  deposit.userId,
+    type:    "WITHDRAWAL_REJECTED",
+    title:   "Пополнение отклонено",
+    message: adminNote,
+    href:    "/deposit",
+  }).catch(() => {});
+
+  revalidatePath("/admin/deposits");
+
+  return { success: "Заявка отклонена" };
+}
