@@ -2,6 +2,9 @@ import Link from "next/link";
 import { prisma } from "@/lib/prisma";
 import type { Metadata } from "next";
 
+// Всегда SSR — статистика должна отражать реальное состояние базы
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "RADRP Market",
   description: "Безопасный маркетплейс для покупки и продажи игровых ценностей Radmir RP.",
