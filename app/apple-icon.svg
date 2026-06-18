@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180" fill="none">
+  <rect width="180" height="180" rx="40" fill="#0d1219"/>
+  <path d="M90 20L35 45v50c0 30.5 24 59 55 66.5 31-7.5 55-36 55-66.5V45L90 20z" fill="#22c55e" opacity="0.15"/>
+  <path d="M90 20L35 45v50c0 30.5 24 59 55 66.5 31-7.5 55-36 55-66.5V45L90 20z" stroke="#22c55e" stroke-width="7" stroke-linejoin="round"/>
+  <text x="90" y="118" font-family="Arial Black, Arial, sans-serif" font-weight="900" font-size="72" fill="#22c55e" text-anchor="middle" letter-spacing="-2">R</text>
+</svg>

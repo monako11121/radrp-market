@@ -1,5 +1,11 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "RADRP Market",
+  description: "Безопасный маркетплейс для покупки и продажи игровых ценностей Radmir RP.",
+};
 
 const CATEGORIES = [
 {

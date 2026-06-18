@@ -1,6 +1,12 @@
 import { prisma } from "@/lib/prisma";
 import { formatMoney } from "@/lib/formatMoney";
 import { isAdmin } from "@/lib/admin";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Профиль",
+  description: "Ваш профиль на RADRP Market: баланс, товары, история сделок.",
+};
 
 import { getServerSession }
 from "next-auth";

@@ -1,7 +1,12 @@
 import Link from "next/link";
 import { formatMoney } from "@/lib/formatMoney";
-
 import { prisma } from "@/lib/prisma";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Каталог",
+  description: "Все товары маркетплейса Radmir RP: транспорт, имущество, вирты, аксессуары.",
+};
 
 import {
 categoryIcons,
