@@ -106,17 +106,21 @@ formData.get("pricePerKK")
 const isVirty = category === "Вирты";
 
 if(isVirty){
-if(!stock || stock <= 0){
-return { error: "Укажите количество кк (должно быть > 0)" };
+if(!stock || isNaN(stock) || stock < 1 || !Number.isInteger(stock)){
+return { error: "Количество кк должно быть целым числом ≥ 1" };
 }
-if(!pricePerKK || pricePerKK <= 0){
-return { error: "Укажите цену за 1кк (должна быть > 0)" };
+if(!pricePerKK || isNaN(pricePerKK) || pricePerKK < 0.01){
+return { error: "Цена за 1кк должна быть ≥ 0.01" };
 }
 }
 
+// Гарантируем неотрицательность перед записью в БД
+const safeStock    = stock    !== null ? Math.max(1, stock)    : null;
+const safePriceKK  = pricePerKK !== null ? Math.max(0.01, pricePerKK) : null;
+
 const effectivePrice = isVirty
-? Math.round((stock ?? 0) * (pricePerKK ?? 0) * 100) / 100
-: price;
+? Math.round((safeStock ?? 0) * (safePriceKK ?? 0) * 100) / 100
+: Math.max(0.01, price);
 
 const validationError =
 validateProduct(title,description,effectivePrice,category,server);
@@ -133,8 +137,8 @@ description,
 price:effectivePrice,
 category,
 server,
-stock,
-pricePerKK,
+stock:safeStock,
+pricePerKK:safePriceKK,
 sellerId:user.id,
 },
 

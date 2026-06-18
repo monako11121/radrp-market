@@ -130,6 +130,8 @@ marginBottom:12,
 name="stock"
 type="number"
 placeholder="100"
+min="1"
+step="1"
 value={stockKk}
 onChange={(e)=>setStockKk(e.target.value)}
 style={inputStyle}
@@ -141,7 +143,9 @@ style={inputStyle}
 <input
 name="pricePerKK"
 type="number"
-placeholder="2"
+placeholder="0.01"
+min="0.01"
+step="0.01"
 value={pricePer}
 onChange={(e)=>setPricePer(e.target.value)}
 style={inputStyle}
