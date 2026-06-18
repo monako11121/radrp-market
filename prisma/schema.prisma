@@ -55,9 +55,10 @@ model Deal {
   buyerId      String
   sellerId     String
   productId    String
-  price        Float                @default(0)
-  isFrozen     Boolean              @default(false)
-  disputedAt   DateTime?
+  price             Float                @default(0)
+  purchasedAmountKk Float?
+  isFrozen          Boolean              @default(false)
+  disputedAt        DateTime?
   createdAt    DateTime             @default(now())
   buyer        User                 @relation("BuyerDeals", fields: [buyerId], references: [id])
   product      Product              @relation(fields: [productId], references: [id])

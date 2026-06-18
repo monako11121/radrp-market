@@ -8,16 +8,27 @@ type Props = {
   productId:    string;
   productTitle: string;
   productPrice: number;
+  isVirty?:     boolean;
+  stockKk?:     number;
+  pricePerKk?:  number;
 };
 
 export default function BuyConfirmModal({
   productId,
   productTitle,
   productPrice,
+  isVirty    = false,
+  stockKk,
+  pricePerKk,
 }: Props){
 
   const [open, setOpen] = useState(false);
   const [state, formAction, isPending] = useActionState(createDeal, null);
+  const [amountKk, setAmountKk] = useState(1);
+
+  const totalPrice = isVirty
+    ? Math.round(amountKk * (pricePerKk ?? 0) * 100) / 100
+    : productPrice;
 
   // Закрыть по Escape
   useEffect(()=>{
@@ -120,9 +131,11 @@ export default function BuyConfirmModal({
                   <div style={{ fontWeight:700, fontSize:16 }}>{productTitle}</div>
                 </div>
                 <div style={{ textAlign:"right", flexShrink:0 }}>
-                  <div style={{ fontSize:12, color:"#7e8796", marginBottom:4 }}>Цена</div>
+                  <div style={{ fontSize:12, color:"#7e8796", marginBottom:4 }}>
+                    {isVirty ? "Итого" : "Цена"}
+                  </div>
                   <div style={{ fontSize:22, fontWeight:900, color:"#ff9a00" }}>
-                    {formatMoney(productPrice)}
+                    {formatMoney(totalPrice)}
                   </div>
                 </div>
               </div>
@@ -160,6 +173,43 @@ export default function BuyConfirmModal({
               ))}
             </div>
 
+            {/* Количество кк для Вирты */}
+            {isVirty && (
+              <div style={{ marginBottom:20 }}>
+                <div style={{ fontSize:13, color:"#7e8796", marginBottom:8 }}>
+                  Количество кк
+                  {stockKk !== undefined && (
+                    <span style={{ color:"#4a5568" }}> (доступно: {stockKk}кк)</span>
+                  )}
+                </div>
+                <input
+                  type="number"
+                  min={1}
+                  max={stockKk}
+                  value={amountKk}
+                  onChange={e => {
+                    const v = Math.max(1, Math.min(stockKk ?? Infinity, Number(e.target.value) || 1));
+                    setAmountKk(v);
+                  }}
+                  style={{
+                    width:"100%",
+                    height:52,
+                    background:"#0d1219",
+                    border:"1px solid #1d2734",
+                    borderRadius:14,
+                    padding:"0 18px",
+                    color:"white",
+                    outline:"none",
+                    fontSize:16,
+                    fontWeight:700,
+                  }}
+                />
+                <div style={{ fontSize:12, color:"#7e8796", marginTop:6 }}>
+                  {formatMoney(pricePerKk ?? 0)} за 1кк × {amountKk}кк = {formatMoney(totalPrice)}
+                </div>
+              </div>
+            )}
+
             {/* Ошибка */}
             {state?.error && (
               <div
@@ -182,6 +232,7 @@ export default function BuyConfirmModal({
 
               <form action={formAction} style={{ width:"100%" }}>
                 <input type="hidden" name="productId" value={productId} />
+                {isVirty && <input type="hidden" name="amountKk" value={amountKk} />}
                 <button
                   type="submit"
                   className="orangeButton"
@@ -191,7 +242,7 @@ export default function BuyConfirmModal({
                     opacity: isPending ? 0.7 : 1,
                   }}
                 >
-                  {isPending ? "Обработка..." : `Подтвердить и заморозить ${formatMoney(productPrice)}`}
+                  {isPending ? "Обработка..." : `Подтвердить и заморозить ${formatMoney(totalPrice)}`}
                 </button>
               </form>
 

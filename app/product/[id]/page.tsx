@@ -497,7 +497,14 @@ textAlign:"center",
 <BuyConfirmModal
 productId={product.id}
 productTitle={product.title}
-productPrice={product.price}
+productPrice={
+product.category === "Вирты"
+? (product.pricePerKK ?? product.price)
+: product.price
+}
+isVirty={product.category === "Вирты"}
+stockKk={product.stock ?? undefined}
+pricePerKk={product.pricePerKK ?? undefined}
 />
 </div>
 

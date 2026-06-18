@@ -103,8 +103,21 @@ formData.get("pricePerKK")
 ? Number(formData.get("pricePerKK"))
 : null;
 
+const isVirty = category === "Вирты";
+
+if(isVirty){
+if(!stock || stock <= 0){
+return { error: "Укажите количество кк (должно быть > 0)" };
+}
+if(!pricePerKK || pricePerKK <= 0){
+return { error: "Укажите цену за 1кк (должна быть > 0)" };
+}
+}
+
+const effectivePrice = isVirty ? (pricePerKK ?? 0) : price;
+
 const validationError =
-validateProduct(title,description,price,category,server);
+validateProduct(title,description,effectivePrice,category,server);
 
 if(validationError){
 return { error: validationError };
@@ -115,7 +128,7 @@ await prisma.product.create({
 data:{
 title,
 description,
-price,
+price:effectivePrice,
 category,
 server,
 stock,

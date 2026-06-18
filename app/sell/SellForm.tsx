@@ -232,12 +232,13 @@ fontSize:15,
 <div
 style={{
 display:"grid",
-gridTemplateColumns:"repeat(2,1fr)",
+gridTemplateColumns: category === "Вирты" ? "1fr" : "repeat(2,1fr)",
 gap:20,
 marginBottom:30,
 }}
 >
 
+{category !== "Вирты" && (
 <div>
 
 <div
@@ -271,6 +272,7 @@ fontSize:15,
 />
 
 </div>
+)}
 
 <div>
 

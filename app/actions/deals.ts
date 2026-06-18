@@ -135,6 +135,15 @@ where:{ id:dealId },
 data:{ status:"DONE" },
 });
 
+// Для Вирты — списываем кк со склада
+if(deal.product.category === "Вирты" && deal.purchasedAmountKk){
+const newStock = Math.max(0, (deal.product.stock ?? 0) - deal.purchasedAmountKk);
+await tx.product.update({
+where:{ id:deal.productId },
+data:{ stock:newStock },
+});
+}
+
 if(hasFrozen){
 // Нормальный флоу: списываем из frozen
 await tx.user.update({
@@ -298,21 +307,38 @@ if(product.sellerId === buyer.id){
 return { error: "Нельзя купить собственный товар" };
 }
 
-// Если уже есть активная замороженная сделка — редирект туда
+const isVirty = product.category === "Вирты";
+
+// Для Вирты — определяем количество кк и итоговую цену
+let amountKk = 0;
+let totalPrice = product.price;
+
+if(isVirty){
+amountKk = parseFloat((formData.get("amountKk") as string) || "0");
+if(!amountKk || amountKk <= 0){
+return { error: "Укажите количество кк" };
+}
+if(!product.pricePerKK){
+return { error: "Товар настроен неверно (нет цены за 1кк)" };
+}
+totalPrice = Math.round(amountKk * product.pricePerKK * 100) / 100;
+}
+
+// Если уже есть активная замороженная сделка (только для не-Вирты)
+if(!isVirty){
 const existingFrozenDeal =
 await prisma.deal.findFirst({
 where:{
 buyerId:buyer.id,
 productId:product.id,
 isFrozen:true,
-status:{
-in:["WAITING","IN_PROGRESS"],
-},
+status:{ in:["WAITING","IN_PROGRESS"] },
 },
 });
 
 if(existingFrozenDeal){
 redirect(`/deals?id=${existingFrozenDeal.id}`);
+}
 }
 
 // Проверяем и замораживаем баланс внутри транзакции
@@ -333,16 +359,29 @@ if(!freshBuyer){
 throw new TxError("BUYER_NOT_FOUND");
 }
 
-if(freshBuyer.availableBalance < product.price){
+if(freshBuyer.availableBalance < totalPrice){
 throw new TxError(
 "INSUFFICIENT",
-product.price,
+totalPrice,
 freshBuyer.availableBalance,
 );
 }
 
-// Если у покупателя уже есть незамороженная сделка по этому товару —
-// используем её вместо создания новой
+// Для Вирты — проверяем остаток стока под блокировкой транзакции
+if(isVirty){
+const freshProduct = await tx.product.findUnique({
+where:{ id:product.id },
+select:{ stock:true },
+});
+if(!freshProduct || (freshProduct.stock ?? 0) < amountKk){
+throw new TxError("INSUFFICIENT_STOCK");
+}
+}
+
+let dealId: string;
+
+if(!isVirty){
+// Для не-Вирты: используем существующий чат-deal если есть
 const existingChatDeal =
 await tx.deal.findFirst({
 where:{
@@ -353,40 +392,47 @@ status:{ in:["WAITING","IN_PROGRESS"] },
 },
 });
 
-let dealId: string;
-
 if(existingChatDeal){
-
 dealId = existingChatDeal.id;
-
 await tx.deal.update({
 where:{ id:dealId },
-data:{ isFrozen:true },
+data:{ isFrozen:true, price:totalPrice },
 });
-
 } else {
-
 const deal = await tx.deal.create({
 data:{
 status:"WAITING",
 buyerId:  buyer.id,
 sellerId: product.sellerId,
 productId:product.id,
-price:    product.price,
+price:    totalPrice,
 isFrozen: true,
 },
 });
-
 dealId = deal.id;
-
+}
+} else {
+// Для Вирты — всегда новая сделка с количеством кк
+const deal = await tx.deal.create({
+data:{
+status:"WAITING",
+buyerId:  buyer.id,
+sellerId: product.sellerId,
+productId:product.id,
+price:    totalPrice,
+isFrozen: true,
+purchasedAmountKk: amountKk,
+},
+});
+dealId = deal.id;
 }
 
 // Замораживаем деньги
 await tx.user.update({
 where:{ id:buyer.id },
 data:{
-availableBalance:{ decrement:product.price },
-frozenBalance:   { increment:product.price },
+availableBalance:{ decrement:totalPrice },
+frozenBalance:   { increment:totalPrice },
 },
 });
 
@@ -394,7 +440,7 @@ await tx.transactionHistory.create({
 data:{
 userId:  buyer.id,
 type:    "FREEZE",
-amount:  product.price,
+amount:  totalPrice,
 description: `Заморозка средств — ${product.title}`,
 dealId,
 productId: product.id,
@@ -420,6 +466,9 @@ if(e.code === "INSUFFICIENT"){
 return {
 error: `Недостаточно средств. Нужно ${formatMoney(e.price)}, доступно ${formatMoney(e.balance)}.`,
 };
+}
+if(e.code === "INSUFFICIENT_STOCK"){
+return { error: "Недостаточно кк на складе" };
 }
 if(e.code === "BUYER_NOT_FOUND"){
 return { error: "Пользователь не найден" };
