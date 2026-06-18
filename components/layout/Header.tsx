@@ -81,29 +81,29 @@ borderBottom:"1px solid rgba(255,255,255,.05)",
 
 <div
 style={{
-height:84,
+height:68,
 display:"flex",
 alignItems:"center",
 justifyContent:"space-between",
-gap:24,
+gap:16,
 }}
 >
 
 {/* Лого + навигация */}
-<div style={{ display:"flex", alignItems:"center", gap:42 }}>
+<div style={{ display:"flex", alignItems:"center", gap:20, flexShrink:0 }}>
 
 <Link
 href="/"
-style={{ display:"flex", flexDirection:"column", lineHeight:1, textDecoration:"none" }}
+style={{ display:"flex", flexDirection:"column", lineHeight:1, textDecoration:"none", flexShrink:0 }}
 >
-<span style={{ fontSize:34, fontWeight:900 }}>
+<span style={{ fontSize:26, fontWeight:900 }}>
 <span style={{ color:"#fff" }}>RAD</span>
 <span style={{ color:"#ff9a00" }}>RP</span>
 </span>
-<span style={{ fontSize:11, letterSpacing:3, color:"#7e8796", marginTop:5 }}>MARKET</span>
+<span style={{ fontSize:10, letterSpacing:3, color:"#7e8796", marginTop:4 }}>MARKET</span>
 </Link>
 
-<nav className="desktopNav" style={{ display:"flex", alignItems:"center", gap:14 }}>
+<nav className="desktopNav" style={{ display:"flex", alignItems:"center", gap:2 }}>
 
 <Link href="/"><div className="navButton">Главная</div></Link>
 <Link href="/catalog"><div className="navButton">Каталог</div></Link>
@@ -211,9 +211,9 @@ justifyContent:"space-between",
 </div>
 
 {/* Правая часть: баланс, кнопки */}
-<div style={{ display:"flex", alignItems:"center", gap:14 }}>
+<div style={{ display:"flex", alignItems:"center", gap:8, flexShrink:0 }}>
 
-<div className="desktopActions" style={{ display:"flex", alignItems:"center", gap:14 }}>
+<div className="desktopActions" style={{ display:"flex", alignItems:"center", gap:8 }}>
 
 {session?.user ? (
 <>
@@ -221,42 +221,42 @@ justifyContent:"space-between",
 <div
 className="card"
 style={{
-padding:"10px 16px",
+padding:"7px 12px",
 display:"flex",
 flexDirection:"column",
 alignItems:"center",
 justifyContent:"center",
-gap:2,
-minWidth:90,
+gap:1,
+minWidth:76,
 }}
 >
-<div style={{ fontSize:12, color:"#7e8796", lineHeight:1 }}>Баланс</div>
-<div style={{ fontWeight:800, fontSize:16, lineHeight:1 }}>
+<div style={{ fontSize:11, color:"#7e8796", lineHeight:1 }}>Баланс</div>
+<div style={{ fontWeight:800, fontSize:14, lineHeight:1.2 }}>
 {formatMoney(displayBalance)}
 </div>
 {frozen > 0 && (
-<div style={{ fontSize:11, color:"#ffb340", lineHeight:1 }}>
-заморожено {formatMoney(frozen)}
+<div style={{ fontSize:10, color:"#ffb340", lineHeight:1 }}>
+🔒 {formatMoney(frozen)}
 </div>
 )}
 </div>
 
 <Link href="/deposit">
-<button className="darkButton" style={{ height:48 }}>Пополнить</button>
+<button className="darkButton" style={{ height:38, padding:"0 14px", fontSize:13 }}>Пополнить</button>
 </Link>
 
 <Link href="/sell">
-<button className="orangeButton" style={{ height:48 }}>Продать</button>
+<button className="orangeButton" style={{ height:38, padding:"0 14px", fontSize:13 }}>Продать</button>
 </Link>
 
 <Link href="/notifications" style={{ textDecoration:"none" }}>
-<div style={{ position:"relative", width:40, height:40, display:"flex", alignItems:"center", justifyContent:"center" }}>
+<div style={{ position:"relative", width:36, height:36, display:"flex", alignItems:"center", justifyContent:"center" }}>
 <div
 style={{
-width:40, height:40, borderRadius:14,
+width:36, height:36, borderRadius:12,
 background:"#121821", border:"1px solid #232d3d",
 display:"flex", alignItems:"center", justifyContent:"center",
-fontSize:18, cursor:"pointer",
+fontSize:16, cursor:"pointer",
 }}
 >
 🔔
@@ -264,11 +264,11 @@ fontSize:18, cursor:"pointer",
 {unreadCount > 0 && (
 <div style={{
 position:"absolute", top:-4, right:-4,
-minWidth:18, height:18, borderRadius:999,
+minWidth:16, height:16, borderRadius:999,
 background:"#ff9a00", color:"black",
-fontSize:11, fontWeight:900,
+fontSize:10, fontWeight:900,
 display:"flex", alignItems:"center", justifyContent:"center",
-padding:"0 4px",
+padding:"0 3px",
 }}>
 {unreadCount > 99 ? "99+" : unreadCount}
 </div>
@@ -279,10 +279,10 @@ padding:"0 4px",
 <Link href="/profile" style={{ textDecoration:"none" }}>
 <div
 style={{
-width:48, height:48, borderRadius:"50%",
+width:36, height:36, borderRadius:"50%",
 background:"linear-gradient(180deg,#202938,#121821)",
 display:"flex", alignItems:"center", justifyContent:"center",
-fontWeight:700, color:"white",
+fontWeight:700, fontSize:14, color:"white",
 }}
 >
 {session.user.name?.[0] ?? "?"}
@@ -292,7 +292,7 @@ fontWeight:700, color:"white",
 <button
 onClick={()=>signOut({ callbackUrl:"/" })}
 className="darkButton"
-style={{ height:48 }}
+style={{ height:38, padding:"0 14px", fontSize:13 }}
 >
 Выйти
 </button>
@@ -311,9 +311,9 @@ style={{ height:48 }}
 className="mobileMenuButton"
 onClick={()=>setMenuOpen(!menuOpen)}
 style={{
-width:48, height:48, borderRadius:14,
+width:40, height:40, borderRadius:12,
 background:"#121821", border:"1px solid #232d3d",
-color:"white", fontSize:24, display:"none",
+color:"white", fontSize:20, display:"none",
 }}
 >
 ☰
