@@ -274,7 +274,7 @@ gap:20,
 <div style={labelStyle}>Username</div>
 <input
 name="username"
-placeholder="Vadym"
+placeholder="Введите username"
 required
 style={inputStyle}
 />
@@ -285,7 +285,7 @@ style={inputStyle}
 <input
 name="email"
 type="email"
-placeholder="example@gmail.com"
+placeholder="Введите email"
 required
 style={inputStyle}
 />
