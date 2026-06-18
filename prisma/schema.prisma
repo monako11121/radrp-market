@@ -12,6 +12,7 @@ model User {
   username                 String               @unique
   email                    String               @unique
   password                 String
+  role                     String               @default("USER")
   availableBalance         Float                @default(0)
   frozenBalance            Float                @default(0)
   pendingWithdrawalBalance Float                @default(0)

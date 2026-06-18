@@ -1,119 +1,55 @@
 import { prisma } from "@/lib/prisma";
-
 import bcrypt from "bcrypt";
+import { AuthOptions } from "next-auth";
+import CredentialsProvider from "next-auth/providers/credentials";
 
-import {
-AuthOptions,
-} from "next-auth";
+export const authOptions: AuthOptions = {
 
-import CredentialsProvider
-from "next-auth/providers/credentials";
+  providers: [
+    CredentialsProvider({
+      name: "credentials",
+      credentials: { email: {}, password: {} },
 
-export const authOptions:
-AuthOptions = {
+      async authorize(credentials) {
+        if (!credentials) return null;
 
-providers:[
+        const user = await prisma.user.findUnique({
+          where: { email: credentials.email },
+        });
+        if (!user) return null;
 
-CredentialsProvider({
+        const isValid = await bcrypt.compare(credentials.password, user.password);
+        if (!isValid) return null;
 
-name:"credentials",
+        return {
+          id:    user.id,
+          email: user.email,
+          name:  user.username,
+          role:  user.role,
+        };
+      },
+    }),
+  ],
 
-credentials:{
+  session: { strategy: "jwt" },
 
-email:{},
-password:{},
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id   = user.id;
+        token.role = user.role;
+      }
+      return token;
+    },
 
-},
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id   = token.id   as string;
+        session.user.role = token.role as string ?? "USER";
+      }
+      return session;
+    },
+  },
 
-async authorize(credentials){
-
-if(!credentials){
-
-return null;
-
-}
-
-const user =
-await prisma.user.findUnique({
-
-where:{
-email:credentials.email,
-},
-
-});
-
-if(!user){
-
-return null;
-
-}
-
-const isValid =
-await bcrypt.compare(
-credentials.password,
-user.password
-);
-
-if(!isValid){
-
-return null;
-
-}
-
-return{
-
-id:user.id,
-email:user.email,
-name:user.username,
-
-};
-
-},
-
-}),
-
-],
-
-session:{
-strategy:"jwt",
-},
-
-callbacks:{
-
-async jwt({
-token,
-user,
-}){
-
-if(user){
-
-token.id = user.id;
-
-}
-
-return token;
-
-},
-
-async session({
-session,
-token,
-}){
-
-if(session.user){
-
-session.user.id =
-token.id as string;
-
-}
-
-return session;
-
-},
-
-},
-
-secret:
-process.env.NEXTAUTH_SECRET,
-
+  secret: process.env.NEXTAUTH_SECRET,
 };

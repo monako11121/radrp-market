@@ -9,7 +9,7 @@ export default async function AdminDisputesPage(){
 
 const session = await getServerSession(authOptions);
 
-if(!session?.user?.email || !isAdmin(session.user.email)){
+if(!session?.user?.email || !isAdmin(session.user.role)){
 redirect("/");
 }
 
