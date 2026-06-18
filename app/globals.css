@@ -336,4 +336,10 @@ width:100%;
 
 }
 
+.settingsGrid{
+
+grid-template-columns:1fr !important;
+
+}
+
 }

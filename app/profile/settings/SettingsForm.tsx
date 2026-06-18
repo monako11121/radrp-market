@@ -109,6 +109,7 @@ gap:20,
 >
 
 <div
+className="settingsGrid"
 style={{
 display:"grid",
 gridTemplateColumns:"repeat(2,1fr)",
