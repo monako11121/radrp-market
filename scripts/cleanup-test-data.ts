@@ -1,9 +1,26 @@
 /**
  * Скрипт очистки тестовых данных перед реальным запуском.
  *
- * Запуск:
- *   npx tsx scripts/cleanup-test-data.ts          — режим preview (ничего не удаляет)
- *   CONFIRM_CLEANUP=true npx tsx scripts/cleanup-test-data.ts  — реальное удаление
+ * Запуск (preview — ничего не удаляет):
+ *   npx tsx scripts/cleanup-test-data.ts
+ *
+ * Реальное удаление:
+ *   CONFIRM_CLEANUP=true npx tsx scripts/cleanup-test-data.ts
+ *
+ * Порядок удаления выведен из FK-графа prisma/schema.prisma:
+ *   Message        → Deal, User
+ *   TicketMessage  → SupportTicket, User
+ *   AdminDecision  → Deal
+ *   Review         → Deal, User
+ *   TransactionHistory → User, Deal?, Product?, DepositRequest?, WithdrawalRequest?
+ *   Notification   → User
+ *   Favorite       → User, Product
+ *   DepositRequest → User
+ *   WithdrawalRequest → User
+ *   SupportTicket  → User
+ *   Deal           → User, Product
+ *   Product        → User
+ *   User
  */
 
 import { PrismaClient } from "@prisma/client";
@@ -13,15 +30,12 @@ const prisma = new PrismaClient();
 
 const CONFIRM = process.env.CONFIRM_CLEANUP === "true";
 
-// Читаем ADMIN_EMAILS из окружения (те же что и на сайте)
 const ADMIN_EMAILS: string[] = (process.env.ADMIN_EMAILS ?? "")
   .split(",")
   .map((e) => e.trim().toLowerCase())
   .filter(Boolean);
 
-function log(msg: string) {
-  console.log(msg);
-}
+function log(msg: string) { console.log(msg); }
 
 function section(title: string) {
   console.log(`\n${"─".repeat(60)}`);
@@ -29,7 +43,7 @@ function section(title: string) {
   console.log("─".repeat(60));
 }
 
-async function confirm(question: string): Promise<boolean> {
+async function promptConfirm(question: string): Promise<boolean> {
   const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
   return new Promise((resolve) => {
     rl.question(`${question} [y/N] `, (answer) => {
@@ -44,104 +58,116 @@ async function main() {
   console.log(`Режим: ${CONFIRM ? "🔴 РЕАЛЬНОЕ УДАЛЕНИЕ" : "👁  PREVIEW (только подсчёт)"}`);
 
   if (ADMIN_EMAILS.length > 0) {
-    console.log(`\nЗащищённые email (не будут удалены): ${ADMIN_EMAILS.join(", ")}`);
+    log(`\nЗащищённые email (не будут удалены): ${ADMIN_EMAILS.join(", ")}`);
   } else {
-    console.log("\n⚠  ADMIN_EMAILS не задан в .env — будут защищены только явно заданные администраторы.");
+    log("\n⚠  ADMIN_EMAILS не задан — защита по email отключена. Будут удалены ВСЕ пользователи.");
   }
 
-  // ─── Подсчёт ────────────────────────────────────────────────────────────────
+  // ─── 1. Собираем ID тест-пользователей ──────────────────────────────────────
 
-  section("Подсчёт данных к удалению");
+  section("Анализ данных...");
 
-  // Пользователи не-админы
   const nonAdminUsers = await prisma.user.findMany({
-    where: {
-      email: ADMIN_EMAILS.length > 0 ? { notIn: ADMIN_EMAILS } : undefined,
-    },
+    where: ADMIN_EMAILS.length > 0
+      ? { email: { notIn: ADMIN_EMAILS } }
+      : undefined,
     select: { id: true, username: true, email: true, createdAt: true },
   });
 
   const userIds = nonAdminUsers.map((u) => u.id);
 
+  if (nonAdminUsers.length === 0) {
+    log("\n✅ Нет пользователей для удаления.");
+    await prisma.$disconnect();
+    return;
+  }
+
+  // ─── 2. Собираем ID зависимых сущностей ──────────────────────────────────────
+
+  // Все сделки тест-юзеров (по любой стороне)
+  const deals = await prisma.deal.findMany({
+    where: { OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }] },
+    select: { id: true },
+  });
+  const dealIds = deals.map((d) => d.id);
+
+  // Все тикеты тест-юзеров
+  const tickets = await prisma.supportTicket.findMany({
+    where: { userId: { in: userIds } },
+    select: { id: true },
+  });
+  const ticketIds = tickets.map((t) => t.id);
+
+  // ─── 3. Подсчёт к удалению ───────────────────────────────────────────────────
+
   const [
-    messageCount,
-    dealCount,
-    productCount,
-    notificationCount,
+    msgCount,
+    ticketMsgCount,
+    adminDecisionCount,
+    reviewCount,
     txCount,
+    notifCount,
+    favoriteCount,
     depositCount,
     withdrawalCount,
-    reviewCount,
-    ticketCount,
-    adminDecisionCount,
+    productCount,
   ] = await Promise.all([
-    prisma.message.count({ where: { senderId: { in: userIds } } }),
-    prisma.deal.count({ where: { OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }] } }),
-    prisma.product.count({ where: { sellerId: { in: userIds } } }),
-    prisma.notification.count({ where: { userId: { in: userIds } } }),
+    // Message по dealId — ловим ВСЕ сообщения в тест-сделках (не только от тест-юзеров)
+    prisma.message.count({ where: { dealId: { in: dealIds } } }),
+    // TicketMessage по ticketId — ловим все ответы в тест-тикетах
+    prisma.ticketMessage.count({ where: { ticketId: { in: ticketIds } } }),
+    prisma.adminDecision.count({ where: { dealId: { in: dealIds } } }),
+    prisma.review.count({ where: { dealId: { in: dealIds } } }),
     prisma.transactionHistory.count({ where: { userId: { in: userIds } } }),
+    prisma.notification.count({ where: { userId: { in: userIds } } }),
+    prisma.favorite.count({ where: { userId: { in: userIds } } }),
     prisma.depositRequest.count({ where: { userId: { in: userIds } } }),
     prisma.withdrawalRequest.count({ where: { userId: { in: userIds } } }),
-    prisma.review.count({ where: { OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }] } }),
-    prisma.supportTicket.count({ where: { userId: { in: userIds } } }),
-    prisma.adminDecision.count({
-      where: {
-        deal: {
-          OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }],
-        },
-      },
-    }),
+    prisma.product.count({ where: { sellerId: { in: userIds } } }),
   ]);
 
   log(`\nПользователей (не-админов):    ${nonAdminUsers.length}`);
-  if (nonAdminUsers.length > 0) {
-    nonAdminUsers.slice(0, 20).forEach((u) => {
-      log(`  · ${u.username.padEnd(24)} ${u.email.padEnd(36)} ${u.createdAt.toISOString().slice(0, 10)}`);
-    });
-    if (nonAdminUsers.length > 20) log(`  ... и ещё ${nonAdminUsers.length - 20}`);
-  }
+  nonAdminUsers.slice(0, 20).forEach((u) => {
+    log(`  · ${u.username.padEnd(24)} ${u.email.padEnd(36)} ${u.createdAt.toISOString().slice(0, 10)}`);
+  });
+  if (nonAdminUsers.length > 20) log(`  ... и ещё ${nonAdminUsers.length - 20}`);
 
   log(`\nСвязанные данные:`);
-  log(`  Сообщения:               ${messageCount}`);
-  log(`  Сделки:                  ${dealCount}`);
-  log(`  Решения по спорам:       ${adminDecisionCount}`);
-  log(`  Товары:                  ${productCount}`);
-  log(`  Уведомления:             ${notificationCount}`);
-  log(`  Транзакции:              ${txCount}`);
-  log(`  Заявки на пополнение:    ${depositCount}`);
-  log(`  Заявки на вывод:         ${withdrawalCount}`);
-  log(`  Отзывы:                  ${reviewCount}`);
-  log(`  Тикеты поддержки:        ${ticketCount}`);
+  log(`  Сообщения в сделках:         ${msgCount}`);
+  log(`  Сообщения в тикетах:         ${ticketMsgCount}`);
+  log(`  Решения администратора:      ${adminDecisionCount}`);
+  log(`  Отзывы:                      ${reviewCount}`);
+  log(`  Транзакции:                  ${txCount}`);
+  log(`  Уведомления:                 ${notifCount}`);
+  log(`  Избранное:                   ${favoriteCount}`);
+  log(`  Заявки на пополнение:        ${depositCount}`);
+  log(`  Заявки на вывод:             ${withdrawalCount}`);
+  log(`  Сделки:                      ${dealIds.length}`);
+  log(`  Тикеты:                      ${ticketIds.length}`);
+  log(`  Товары:                      ${productCount}`);
 
   const totalRows =
-    messageCount + dealCount + adminDecisionCount + productCount +
-    notificationCount + txCount + depositCount + withdrawalCount +
-    reviewCount + ticketCount + nonAdminUsers.length;
+    msgCount + ticketMsgCount + adminDecisionCount + reviewCount +
+    txCount + notifCount + favoriteCount + depositCount + withdrawalCount +
+    dealIds.length + ticketIds.length + productCount + nonAdminUsers.length;
 
   log(`\nИТОГО строк к удалению: ${totalRows}`);
 
-  if (totalRows === 0) {
-    log("\n✅ База данных уже пуста. Нечего удалять.");
-    await prisma.$disconnect();
-    return;
-  }
-
-  // ─── Подтверждение ───────────────────────────────────────────────────────────
-
   if (!CONFIRM) {
-    log(`\n──────────────────────────────────────────────────────────`);
+    log(`\n${"─".repeat(60)}`);
     log(`  Режим PREVIEW — данные НЕ удалены.`);
-    log(`  Для реального удаления запустите:`);
+    log(`  Для реального удаления:`);
     log(`  CONFIRM_CLEANUP=true npx tsx scripts/cleanup-test-data.ts`);
-    log(`──────────────────────────────────────────────────────────\n`);
+    log(`${"─".repeat(60)}\n`);
     await prisma.$disconnect();
     return;
   }
 
-  // Дополнительное подтверждение в интерактивном режиме
+  // ─── 4. Дополнительное интерактивное подтверждение ───────────────────────────
+
   if (process.stdin.isTTY) {
-    const ok = await confirm(
-      `\n⚠  Вы уверены? Будет удалено ${totalRows} строк. Это действие необратимо.`
+    const ok = await promptConfirm(
+      `\n⚠  Удалить ${totalRows} строк? Это необратимо.`
     );
     if (!ok) {
       log("Отменено.");
@@ -150,84 +176,98 @@ async function main() {
     }
   }
 
-  // ─── Удаление (порядок важен: сначала зависимые таблицы) ─────────────────────
+  // ─── 5. Удаление в правильном порядке по FK-графу ────────────────────────────
 
-  section("Удаление данных...");
+  section("Удаление...");
 
-  // 1. Сообщения чатов
-  const d1 = await prisma.message.deleteMany({ where: { senderId: { in: userIds } } });
-  log(`✓ Сообщения:            ${d1.count}`);
+  // Шаг 1 — Message (→ Deal, → User)
+  // Фильтруем по dealId чтобы поймать сообщения от любых отправителей в тест-сделках
+  const s1 = await prisma.message.deleteMany({
+    where: { dealId: { in: dealIds } },
+  });
+  log(`✓  Message (сообщения сделок):          ${s1.count}`);
 
-  // 2. Сообщения тикетов
-  const d2 = await prisma.ticketMessage.deleteMany({ where: { userId: { in: userIds } } });
-  log(`✓ Сообщения тикетов:    ${d2.count}`);
+  // Шаг 2 — TicketMessage (→ SupportTicket, → User)
+  // Фильтруем по ticketId чтобы поймать ответы от любых пользователей (включая админов)
+  const s2 = await prisma.ticketMessage.deleteMany({
+    where: { ticketId: { in: ticketIds } },
+  });
+  log(`✓  TicketMessage (сообщения тикетов):   ${s2.count}`);
 
-  // 3. Тикеты
-  const d3 = await prisma.supportTicket.deleteMany({ where: { userId: { in: userIds } } });
-  log(`✓ Тикеты:               ${d3.count}`);
+  // Шаг 3 — AdminDecision (→ Deal)
+  const s3 = await prisma.adminDecision.deleteMany({
+    where: { dealId: { in: dealIds } },
+  });
+  log(`✓  AdminDecision (решения по спорам):   ${s3.count}`);
 
-  // 4. Решения администратора по спорам (ссылаются на сделки)
-  const dealIds = (
-    await prisma.deal.findMany({
-      where: { OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }] },
-      select: { id: true },
-    })
-  ).map((d) => d.id);
+  // Шаг 4 — Review (→ Deal, → User)
+  const s4 = await prisma.review.deleteMany({
+    where: { dealId: { in: dealIds } },
+  });
+  log(`✓  Review (отзывы):                     ${s4.count}`);
 
-  const d4 = await prisma.adminDecision.deleteMany({ where: { dealId: { in: dealIds } } });
-  log(`✓ Решения по спорам:    ${d4.count}`);
+  // Шаг 5 — TransactionHistory (→ User, → Deal?, → Product?, → DepositRequest?, → WithdrawalRequest?)
+  // Удаляем по userId — транзакции не принадлежат другим пользователям
+  const s5 = await prisma.transactionHistory.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  log(`✓  TransactionHistory (транзакции):     ${s5.count}`);
 
-  // 5. Отзывы
-  const d5 = await prisma.review.deleteMany({
+  // Шаг 6 — Notification (→ User)
+  const s6 = await prisma.notification.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  log(`✓  Notification (уведомления):          ${s6.count}`);
+
+  // Шаг 7 — Favorite (→ User, → Product)
+  const s7 = await prisma.favorite.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  log(`✓  Favorite (избранное):                ${s7.count}`);
+
+  // Шаг 8 — DepositRequest (→ User) — TransactionHistory уже удалена
+  const s8 = await prisma.depositRequest.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  log(`✓  DepositRequest (заявки пополнения):  ${s8.count}`);
+
+  // Шаг 9 — WithdrawalRequest (→ User) — TransactionHistory уже удалена
+  const s9 = await prisma.withdrawalRequest.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  log(`✓  WithdrawalRequest (заявки вывода):   ${s9.count}`);
+
+  // Шаг 10 — SupportTicket (→ User) — TicketMessage уже удалена
+  const s10 = await prisma.supportTicket.deleteMany({
+    where: { userId: { in: userIds } },
+  });
+  log(`✓  SupportTicket (тикеты):              ${s10.count}`);
+
+  // Шаг 11 — Deal (→ User, → Product) — Message/AdminDecision/Review/Tx уже удалены
+  const s11 = await prisma.deal.deleteMany({
     where: { OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }] },
   });
-  log(`✓ Отзывы:               ${d5.count}`);
+  log(`✓  Deal (сделки):                       ${s11.count}`);
 
-  // 6. История транзакций
-  const d6 = await prisma.transactionHistory.deleteMany({ where: { userId: { in: userIds } } });
-  log(`✓ Транзакции:           ${d6.count}`);
-
-  // 7. Заявки на пополнение
-  const d7 = await prisma.depositRequest.deleteMany({ where: { userId: { in: userIds } } });
-  log(`✓ Заявки пополнения:    ${d7.count}`);
-
-  // 8. Заявки на вывод
-  const d8 = await prisma.withdrawalRequest.deleteMany({ where: { userId: { in: userIds } } });
-  log(`✓ Заявки на вывод:      ${d8.count}`);
-
-  // 9. Уведомления
-  const d9 = await prisma.notification.deleteMany({ where: { userId: { in: userIds } } });
-  log(`✓ Уведомления:          ${d9.count}`);
-
-  // 10. Сделки
-  const d10 = await prisma.deal.deleteMany({
-    where: { OR: [{ buyerId: { in: userIds } }, { sellerId: { in: userIds } }] },
+  // Шаг 12 — Product (→ User) — Deal/Favorite/Tx уже удалены
+  const s12 = await prisma.product.deleteMany({
+    where: { sellerId: { in: userIds } },
   });
-  log(`✓ Сделки:               ${d10.count}`);
+  log(`✓  Product (товары):                    ${s12.count}`);
 
-  // 11. Избранное
-  const d11 = await prisma.favorite.deleteMany({ where: { userId: { in: userIds } } });
-  log(`✓ Избранное:            ${d11.count}`);
-
-  // 12. Товары
-  const d12 = await prisma.product.deleteMany({ where: { sellerId: { in: userIds } } });
-  log(`✓ Товары:               ${d12.count}`);
-
-  // 13. Пользователи
-  const d13 = await prisma.user.deleteMany({
-    where: {
-      id: { in: userIds },
-    },
+  // Шаг 13 — User — всё связанное удалено
+  const s13 = await prisma.user.deleteMany({
+    where: { id: { in: userIds } },
   });
-  log(`✓ Пользователи:         ${d13.count}`);
+  log(`✓  User (пользователи):                 ${s13.count}`);
 
-  section("Готово ✅");
-  log(`Всего удалено строк: ${
-    d1.count + d2.count + d3.count + d4.count + d5.count + d6.count +
-    d7.count + d8.count + d9.count + d10.count + d11.count + d12.count + d13.count
-  }`);
+  const deleted =
+    s1.count + s2.count + s3.count + s4.count + s5.count + s6.count +
+    s7.count + s8.count + s9.count + s10.count + s11.count + s12.count + s13.count;
+
+  section(`Готово ✅  Удалено строк: ${deleted}`);
   if (ADMIN_EMAILS.length > 0) {
-    log(`Защищены администраторы: ${ADMIN_EMAILS.join(", ")}`);
+    log(`Защищены: ${ADMIN_EMAILS.join(", ")}`);
   }
   log("");
 
