@@ -119,14 +119,28 @@ export default async function AdminDepositsPage({
 
               </div>
 
-              {dep.txHash && (
+              {dep.txHash ? (
                 <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(34,197,94,.06)", border: "1px solid rgba(34,197,94,.15)" }}>
                   <div style={{ fontSize: 11, color: "#7e8796", marginBottom: 2 }}>TX HASH</div>
-                  <div style={{ fontFamily: "monospace", fontSize: 13, wordBreak: "break-all", color: "#22c55e" }}>
+                  <div style={{ fontFamily: "monospace", fontSize: 13, wordBreak: "break-all", color: "#22c55e", marginBottom: 8 }}>
                     {dep.txHash}
                   </div>
+                  <a
+                    href={`https://tronscan.org/#/transaction/${encodeURIComponent(dep.txHash)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={{ fontSize: 12, color: "#ff9a00", fontWeight: 600, textDecoration: "underline" }}
+                  >
+                    Проверить в Tronscan →
+                  </a>
                 </div>
-              )}
+              ) : dep.status === "PENDING" ? (
+                <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(239,68,68,.06)", border: "1px solid rgba(239,68,68,.15)" }}>
+                  <div style={{ fontSize: 13, color: "#ef4444" }}>
+                    Пользователь пока не указал TX Hash
+                  </div>
+                </div>
+              ) : null}
 
               {dep.adminNote && (
                 <div style={{ marginBottom: 12, padding: "10px 14px", borderRadius: 10, background: "rgba(255,255,255,.04)", border: "1px solid rgba(255,255,255,.08)" }}>
@@ -136,7 +150,7 @@ export default async function AdminDepositsPage({
               )}
 
               {dep.status === "PENDING" && (
-                <AdminDepositActions depositId={dep.id} amount={dep.amount} />
+                <AdminDepositActions depositId={dep.id} amount={dep.amount} txHash={dep.txHash} />
               )}
 
             </div>

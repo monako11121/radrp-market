@@ -6,9 +6,11 @@ import { adminApproveCryptoDeposit, adminRejectCryptoDeposit } from "@/app/actio
 interface Props {
   depositId: string;
   amount: number;
+  txHash: string | null;
 }
 
-export default function AdminDepositActions({ depositId, amount }: Props) {
+export default function AdminDepositActions({ depositId, amount, txHash }: Props) {
+  const canApprove = !!txHash?.trim();
   const [approveState, approveAction, approvePending] = useActionState(adminApproveCryptoDeposit, null);
   const [rejectState,  rejectAction,  rejectPending]  = useActionState(adminRejectCryptoDeposit, null);
 
@@ -49,27 +51,35 @@ export default function AdminDepositActions({ depositId, amount }: Props) {
         </div>
       )}
 
+      {!canApprove && (
+        <div style={{
+          padding: "12px 16px",
+          borderRadius: 10,
+          background: "rgba(255,180,64,.08)",
+          border: "1px solid rgba(255,180,64,.25)",
+          color: "#ffb340",
+          fontSize: 13,
+        }}>
+          ⚠ Пользователь ещё не указал TX Hash транзакции. Подтверждение недоступно, пока хэш не появится в заявке.
+        </div>
+      )}
+
+      {canApprove && (
+        <div style={{
+          padding: "12px 16px",
+          borderRadius: 10,
+          background: "rgba(255,154,0,.06)",
+          border: "1px solid rgba(255,154,0,.18)",
+          color: "#b0bac8",
+          fontSize: 13,
+          lineHeight: 1.6,
+        }}>
+          Подтверждайте только после проверки суммы, адреса и сети TRC20 в Tronscan.
+        </div>
+      )}
+
       <form action={approveAction} style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "flex-end" }}>
         <input type="hidden" name="depositId" value={depositId} />
-        <div style={{ flex: 1, minWidth: 200 }}>
-          <div style={{ fontSize: 12, color: "#7e8796", marginBottom: 4 }}>TX Hash (необязательно)</div>
-          <input
-            name="txHash"
-            placeholder="TRC20 hash..."
-            style={{
-              width: "100%",
-              height: 40,
-              background: "#0d1219",
-              border: "1px solid #1d2734",
-              borderRadius: 10,
-              padding: "0 12px",
-              color: "white",
-              fontSize: 13,
-              fontFamily: "monospace",
-              boxSizing: "border-box",
-            }}
-          />
-        </div>
         <div style={{ flex: 1, minWidth: 200 }}>
           <div style={{ fontSize: 12, color: "#7e8796", marginBottom: 4 }}>Заметка (необязательно)</div>
           <input
@@ -90,17 +100,18 @@ export default function AdminDepositActions({ depositId, amount }: Props) {
         </div>
         <button
           type="submit"
-          disabled={approvePending || rejectPending}
+          disabled={!canApprove || approvePending || rejectPending}
+          title={!canApprove ? "Недоступно без TX Hash" : undefined}
           style={{
             height: 40,
             padding: "0 20px",
             borderRadius: 10,
-            background: "#22c55e",
-            color: "black",
+            background: canApprove ? "#22c55e" : "rgba(255,255,255,.08)",
+            color: canApprove ? "black" : "#5a6472",
             fontWeight: 800,
             fontSize: 14,
             border: "none",
-            cursor: approvePending ? "wait" : "pointer",
+            cursor: !canApprove ? "not-allowed" : approvePending ? "wait" : "pointer",
             opacity: approvePending ? 0.7 : 1,
             whiteSpace: "nowrap",
           }}

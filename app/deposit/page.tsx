@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { requestCryptoDeposit } from "@/app/actions/payments";
 import { formatMoney } from "@/lib/formatMoney";
 import Link from "next/link";
+import SubmitTxHashForm from "@/components/deposit/SubmitTxHashForm";
 
 export default function DepositPage() {
   const { data: session, status } = useSession();
@@ -117,6 +118,14 @@ export default function DepositPage() {
             <div style={{ fontFamily: "monospace", fontSize: 13, color: "#b0bac8", wordBreak: "break-all" }}>
               {state.depositId}
             </div>
+          </div>
+
+          {/* TX Hash — обязателен для подтверждения */}
+          <div className="card" style={{ padding: "20px 24px", marginBottom: 24 }}>
+            <div style={{ fontSize: 12, color: "#7e8796", marginBottom: 12, letterSpacing: 1 }}>
+              ПОСЛЕ ПЕРЕВОДА — УКАЖИТЕ TX HASH
+            </div>
+            <SubmitTxHashForm depositId={state.depositId} />
           </div>
 
           {/* Инструкция */}

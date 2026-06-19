@@ -322,6 +322,53 @@ export async function requestCryptoDeposit(
   return { depositId: deposit.id, amount: amountRaw, walletAddress };
 }
 
+// Пользователь добавляет TX Hash к своей заявке — до этого админ не может подтвердить
+export type TxHashState = { error?: string; success?: string } | null;
+
+export async function submitDepositTxHash(
+  _prev: TxHashState,
+  formData: FormData,
+): Promise<TxHashState> {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.email) redirect("/auth");
+
+  const user = await prisma.user.findUnique({ where: { email: session.user.email } });
+  if (!user) redirect("/auth");
+
+  const depositId = formData.get("depositId") as string;
+  const txHash = (formData.get("txHash") as string)?.trim();
+
+  if (!txHash) {
+    return { error: "Введите хэш транзакции" };
+  }
+  if (txHash.length < 10) {
+    return { error: "Хэш транзакции выглядит некорректно" };
+  }
+
+  const deposit = await prisma.depositRequest.findUnique({ where: { id: depositId } });
+  if (!deposit) return { error: "Заявка не найдена" };
+  if (deposit.userId !== user.id) return { error: "Доступ запрещён" };
+  if (deposit.status !== "PENDING") return { error: "Заявка уже обработана" };
+
+  // TX hash не должен повторяться в других заявках
+  const duplicate = await prisma.depositRequest.findFirst({
+    where: { txHash, id: { not: depositId } },
+  });
+  if (duplicate) {
+    return { error: "Этот хэш транзакции уже использован в другой заявке" };
+  }
+
+  await prisma.depositRequest.update({
+    where: { id: depositId },
+    data:  { txHash },
+  });
+
+  revalidatePath("/deposit");
+  revalidatePath("/admin/deposits");
+
+  return { success: "TX Hash сохранён. Ожидайте подтверждения администратора." };
+}
+
 // Подтвердить крипто-пополнение (администратор) — зачислить баланс
 export async function adminApproveCryptoDeposit(
   _prev: PaymentActionState,
@@ -330,12 +377,27 @@ export async function adminApproveCryptoDeposit(
   await requireAdmin();
 
   const depositId = formData.get("depositId") as string;
-  const txHash    = (formData.get("txHash") as string)?.trim() || null;
   const adminNote = (formData.get("adminNote") as string)?.trim() || null;
 
   const deposit = await prisma.depositRequest.findUnique({ where: { id: depositId } });
   if (!deposit) return { error: "Заявка не найдена" };
   if (deposit.status !== "PENDING") return { error: "Заявка уже обработана" };
+
+  // TX hash должен быть указан пользователем заранее — админ не вводит его сам.
+  // Эта проверка обязательна на сервере: кнопка может быть disabled на клиенте,
+  // но запрос можно отправить вручную через DevTools.
+  const txHash = deposit.txHash?.trim();
+  if (!txHash) {
+    return { error: "Нельзя подтвердить заявку без TX Hash. Дождитесь, пока пользователь укажет хэш транзакции." };
+  }
+
+  // Защита от повторного использования одного txHash в нескольких заявках
+  const duplicate = await prisma.depositRequest.findFirst({
+    where: { txHash, id: { not: depositId }, status: { in: ["PENDING", "APPROVED"] } },
+  });
+  if (duplicate) {
+    return { error: "Этот TX Hash уже использован в другой заявке" };
+  }
 
   try {
     await prisma.$transaction(async (tx) => {
@@ -344,7 +406,6 @@ export async function adminApproveCryptoDeposit(
         data: {
           status:      "APPROVED",
           completedAt: new Date(),
-          txHash:      txHash  ?? undefined,
           adminNote:   adminNote ?? undefined,
         },
       });
